@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import feLogo from '@/assets/fe_logo.png';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -51,15 +52,7 @@ export function AppSidebar() {
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <FileText className="w-5 h-5 text-sidebar-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="font-bold text-sidebar-foreground text-sm leading-tight">
-              First Exchange
-            </h1>
-            <p className="text-xs text-sidebar-foreground/60">Invoice System</p>
-          </div>
+          <img src={feLogo} alt="First Exchange LLC" className="h-10 w-auto" />
         </div>
       </div>
 
