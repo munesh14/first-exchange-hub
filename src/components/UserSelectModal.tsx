@@ -17,15 +17,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Building2, User as UserIcon } from 'lucide-react';
+import { Building2, User as UserIcon, AlertCircle, Loader2 } from 'lucide-react';
 
 export function UserSelectModal() {
   const { isUserModalOpen, setIsUserModalOpen, setCurrentUser, currentUser } = useUser();
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, error, isError } = useQuery({
     queryKey: ['users'],
     queryFn: api.getUsers,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   useEffect(() => {
@@ -60,17 +62,38 @@ export function UserSelectModal() {
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {isError && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-destructive">Failed to load users from API</p>
+                <p className="text-muted-foreground mt-1">
+                  {error instanceof Error ? error.message : 'Unknown error'}
+                </p>
+                <p className="text-muted-foreground mt-1">Using test users instead.</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
               Select User
             </label>
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={isLoading}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose your name..." />
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading users...</span>
+                  </div>
+                ) : (
+                  <SelectValue placeholder="Choose your name..." />
+                )}
               </SelectTrigger>
               <SelectContent className="bg-popover">
                 {isLoading ? (
-                  <div className="p-4 text-center text-muted-foreground">
+                  <div className="p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Loading users...
                   </div>
                 ) : (
@@ -109,7 +132,7 @@ export function UserSelectModal() {
 
           <Button
             onClick={handleConfirm}
-            disabled={!selectedUserId}
+            disabled={!selectedUserId || isLoading}
             className="w-full"
             size="lg"
           >
