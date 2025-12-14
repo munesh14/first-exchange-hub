@@ -17,18 +17,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Building2, User as UserIcon, AlertCircle, Loader2 } from 'lucide-react';
+import { Building2, User as UserIcon, Loader2 } from 'lucide-react';
 import feLogo from '@/assets/fe_logo.png';
 
 export function UserSelectModal() {
   const { isUserModalOpen, setIsUserModalOpen, setCurrentUser, currentUser } = useUser();
   const [selectedUserId, setSelectedUserId] = useState<string>('');
 
-  const { data: users, isLoading, error, isError } = useQuery({
+  const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: api.getUsers,
-    retry: 2,
-    retryDelay: 1000,
   });
 
   useEffect(() => {
@@ -71,18 +69,6 @@ export function UserSelectModal() {
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {isError && (
-            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-destructive">Failed to load users from API</p>
-                <p className="text-muted-foreground mt-1">
-                  {error instanceof Error ? error.message : 'Unknown error'}
-                </p>
-                <p className="text-muted-foreground mt-1">Using test users instead.</p>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
