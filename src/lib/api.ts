@@ -252,7 +252,7 @@ export const api = {
     return apiCall<Invoice[]>(`/invoice-api/invoices${queryString ? `?${queryString}` : ''}`);
   },
   
-  getInvoice: (uuid: string) => apiCall<InvoiceDetail>(`/invoice-api/invoice/${uuid}`),
+  getInvoice: (uuid: string) => apiCall<InvoiceDetail>(`/invoice-api/get-invoice?uuid=${uuid}`),
   
   uploadInvoice: (data: {
     file: string;
