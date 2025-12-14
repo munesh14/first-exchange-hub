@@ -1,5 +1,16 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://firstxehub:3004/webhook';
 
+// Fallback users for development when API is unavailable
+const FALLBACK_USERS = [
+  { UserID: 1, FullName: "Munesh C", Email: "munesh.c@firstexchangeoman.com", DepartmentID: 1, DepartmentName: "Information Technology" },
+  { UserID: 2, FullName: "IT Staff 1", Email: "itstaff1@firstexchangeoman.com", DepartmentID: 1, DepartmentName: "Information Technology" },
+  { UserID: 3, FullName: "Accounts Staff 1", Email: "accstaff1@firstexchangeoman.com", DepartmentID: 2, DepartmentName: "Accounts" },
+  { UserID: 4, FullName: "Marketing Staff 1", Email: "mktstaff1@firstexchangeoman.com", DepartmentID: 3, DepartmentName: "Marketing" },
+  { UserID: 5, FullName: "HR Staff 1", Email: "hrstaff1@firstexchangeoman.com", DepartmentID: 4, DepartmentName: "Human Resources" },
+  { UserID: 6, FullName: "Operations Staff 1", Email: "opsstaff1@firstexchangeoman.com", DepartmentID: 5, DepartmentName: "Operations" },
+  { UserID: 7, FullName: "Compliance Staff 1", Email: "compstaff1@firstexchangeoman.com", DepartmentID: 6, DepartmentName: "Compliance" }
+];
+
 interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -18,14 +29,28 @@ async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Promise<T
   if (body) {
     config.body = JSON.stringify(body);
   }
+
+  const url = `${API_BASE_URL}${endpoint}`;
+  console.log(`API Call: ${method} ${url}`);
   
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  const response = await fetch(url, config);
   
   if (!response.ok) {
     throw new Error(`API Error: ${response.status} ${response.statusText}`);
   }
   
   return response.json();
+}
+
+// Fetch users with fallback
+async function fetchUsersWithFallback(): Promise<User[]> {
+  try {
+    const users = await apiCall<User[]>('/invoice-api/users');
+    return users;
+  } catch (error) {
+    console.log('API unavailable, using fallback users');
+    return FALLBACK_USERS;
+  }
 }
 
 // User Types
@@ -202,7 +227,7 @@ export interface Location {
 // API Functions
 export const api = {
   // Users
-  getUsers: () => apiCall<User[]>('/invoice-api/users'),
+  getUsers: fetchUsersWithFallback,
   
   // Departments
   getDepartments: () => apiCall<Department[]>('/invoice-api/departments'),
