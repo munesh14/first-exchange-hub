@@ -263,11 +263,14 @@ export const api = {
     categoryId: number;
   }) => apiCall<{ uuid: string }>('/invoice-upload', { method: 'POST', body: data }),
   
-  updateInvoice: (uuid: string, data: Partial<Invoice> & { items?: InvoiceItem[] }) =>
-    apiCall<Invoice>(`/invoice-api/invoice/${uuid}`, { method: 'PUT', body: data }),
+  updateInvoice: (data: { invoiceUuid: string; updates: Partial<Invoice> & { items?: InvoiceItem[] }; userId: number }) =>
+    apiCall<{ success: boolean }>('/invoice-api/invoice/update', { method: 'POST', body: data }),
   
-  submitInvoice: (uuid: string) =>
-    apiCall<{ success: boolean }>('/invoice-submit', { method: 'POST', body: { uuid } }),
+  submitInvoice: (data: { invoiceUuid: string; userId: number; comment?: string }) =>
+    apiCall<{ success: boolean }>('/invoice-api/invoice/submit', { method: 'POST', body: data }),
+  
+  approveInvoice: (data: { invoiceUuid: string; action: 'approve' | 'reject' | 'correction'; userId: number; comment?: string }) =>
+    apiCall<{ success: boolean }>('/invoice-api/invoice/approve', { method: 'POST', body: data }),
   
   // Reports
   getDailyReport: (date: string, departmentId?: number) => {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, InvoiceItem, Vendor } from '@/lib/api';
+import { useUser } from '@/contexts/UserContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConfidenceIndicator } from '@/components/ConfidenceIndicator';
@@ -31,6 +32,14 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import {
@@ -40,11 +49,13 @@ import {
   Plus,
   Trash2,
   FileText,
-  Image,
   Loader2,
   Check,
   ChevronsUpDown,
-  Building2,
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -63,9 +74,10 @@ const CURRENCIES = [
 const UNITS = ['EA', 'KG', 'HR', 'PCS', 'BOX', 'SET', 'LTR', 'MTR', 'SQM'];
 
 export default function InvoiceDetail() {
-  const { uuid } = useParams<{ uuid: string }>();
+  const { invoiceUuid } = useParams<{ invoiceUuid: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { currentUser } = useUser();
 
   const [formData, setFormData] = useState({
     invoiceNumber: '',
@@ -85,11 +97,14 @@ export default function InvoiceDetail() {
   const [vendorOpen, setVendorOpen] = useState(false);
   const [addVendorOpen, setAddVendorOpen] = useState(false);
   const [newVendorName, setNewVendorName] = useState('');
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'correction' | null>(null);
+  const [actionComment, setActionComment] = useState('');
 
   const { data: invoiceData, isLoading } = useQuery({
-    queryKey: ['invoice', uuid],
-    queryFn: () => api.getInvoice(uuid!),
-    enabled: !!uuid,
+    queryKey: ['invoice', invoiceUuid],
+    queryFn: () => api.getInvoice(invoiceUuid!),
+    enabled: !!invoiceUuid,
   });
 
   const { data: vendors } = useQuery({
@@ -138,52 +153,112 @@ export default function InvoiceDetail() {
   }, [invoiceData]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => api.updateInvoice(uuid!, data),
+    mutationFn: () => api.updateInvoice({
+      invoiceUuid: invoiceUuid!,
+      updates: {
+        InvoiceNumber: formData.invoiceNumber,
+        InvoiceDate: format(formData.invoiceDate, 'yyyy-MM-dd'),
+        VendorID: formData.vendorId,
+        CurrencyCode: formData.currencyCode,
+        CategoryID: formData.categoryId,
+        SubTotal: formData.subTotal,
+        TaxAmount: formData.taxAmount,
+        DiscountAmount: formData.discountAmount,
+        TotalAmount: formData.totalAmount,
+        Notes: formData.notes,
+        items,
+      },
+      userId: currentUser?.UserID || 0,
+    }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoice', uuid] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoiceUuid] });
       toast({
         title: 'Changes Saved',
         description: 'Invoice has been updated successfully.',
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to save changes. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to save changes.',
         variant: 'destructive',
       });
     },
   });
 
   const submitMutation = useMutation({
-    mutationFn: () => api.submitInvoice(uuid!),
+    mutationFn: () => api.submitInvoice({
+      invoiceUuid: invoiceUuid!,
+      userId: currentUser?.UserID || 0,
+    }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoice', uuid] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoiceUuid] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast({
         title: 'Invoice Submitted',
         description: 'Invoice has been submitted for approval.',
       });
       navigate('/invoices');
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to submit invoice. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to submit invoice.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (action: 'approve' | 'reject' | 'correction') => api.approveInvoice({
+      invoiceUuid: invoiceUuid!,
+      action,
+      userId: currentUser?.UserID || 0,
+      comment: actionComment,
+    }),
+    onSuccess: (_, action) => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoiceUuid] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      const messages = {
+        approve: 'Invoice has been approved.',
+        reject: 'Invoice has been rejected.',
+        correction: 'Invoice has been sent back for correction.',
+      };
+      toast({
+        title: 'Action Completed',
+        description: messages[action],
+      });
+      setActionDialogOpen(false);
+      setActionComment('');
+      navigate('/invoices');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to process action.',
         variant: 'destructive',
       });
     },
   });
 
   const handleSave = () => {
-    updateMutation.mutate({
-      ...formData,
-      items,
-    });
+    updateMutation.mutate();
   };
 
-  const handleSubmit = () => {
-    handleSave();
+  const handleSubmit = async () => {
+    await updateMutation.mutateAsync();
     submitMutation.mutate();
+  };
+
+  const handleAction = (action: 'approve' | 'reject' | 'correction') => {
+    setActionType(action);
+    setActionDialogOpen(true);
+  };
+
+  const confirmAction = () => {
+    if (actionType) {
+      approveMutation.mutate(actionType);
+    }
   };
 
   const addItem = () => {
@@ -210,7 +285,6 @@ export default function InvoiceDetail() {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
 
-    // Auto-calculate total price
     if (field === 'Quantity' || field === 'UnitPrice') {
       newItems[index].TotalPrice =
         (newItems[index].Quantity || 0) * (newItems[index].UnitPrice || 0);
@@ -218,7 +292,6 @@ export default function InvoiceDetail() {
 
     setItems(newItems);
 
-    // Update subtotal
     const subtotal = newItems.reduce(
       (sum, item) => sum + (item.TotalPrice || 0),
       0
@@ -262,6 +335,10 @@ export default function InvoiceDetail() {
         <div className="text-center">
           <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
           <p className="text-muted-foreground">Invoice not found</p>
+          <Button variant="outline" className="mt-4" onClick={() => navigate('/invoices')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Invoices
+          </Button>
         </div>
       </div>
     );
@@ -269,43 +346,87 @@ export default function InvoiceDetail() {
 
   const { invoice } = invoiceData;
   const isImage = invoice.FileType?.startsWith('image/');
+  const isPendingReview = invoice.StatusCode === 'PENDING_REVIEW';
+  const isPendingApproval = invoice.StatusCode === 'PENDING_APPROVAL';
+  const isEditable = isPendingReview;
 
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title={`Invoice ${invoice.InvoiceNumber}`}
+        title={`Invoice ${invoice.InvoiceNumber || 'Details'}`}
         breadcrumbs={[
           { label: 'All Invoices', href: '/invoices' },
-          { label: invoice.InvoiceNumber },
+          { label: invoice.InvoiceNumber || invoiceUuid || '' },
         ]}
         actions={
           <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => navigate('/invoices')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
             <StatusBadge status={invoice.StatusCode} />
-            <Button
-              variant="outline"
-              onClick={handleSave}
-              disabled={updateMutation.isPending}
-              className="gap-2"
-            >
-              {updateMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              Save Changes
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={submitMutation.isPending}
-              className="gap-2"
-            >
-              {submitMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-              Submit for Approval
-            </Button>
+            
+            {isPendingReview && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleSave}
+                  disabled={updateMutation.isPending}
+                  className="gap-2"
+                >
+                  {updateMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Save Changes
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={submitMutation.isPending || updateMutation.isPending}
+                  className="gap-2"
+                >
+                  {submitMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Submit for Approval
+                </Button>
+              </>
+            )}
+
+            {isPendingApproval && (
+              <>
+                <Button
+                  variant="default"
+                  onClick={() => handleAction('approve')}
+                  disabled={approveMutation.isPending}
+                  className="gap-2 bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Approve
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleAction('reject')}
+                  disabled={approveMutation.isPending}
+                  className="gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Reject
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleAction('correction')}
+                  disabled={approveMutation.isPending}
+                  className="gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Request Correction
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -349,153 +470,183 @@ export default function InvoiceDetail() {
             <ConfidenceIndicator score={invoice.AIConfidenceScore} />
           )}
 
+          {/* Vendor Details Card */}
+          <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+            <h2 className="font-semibold mb-4">Vendor Details</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-span-2">
+                <Label>Vendor</Label>
+                {isEditable ? (
+                  <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={vendorOpen}
+                        className="w-full justify-between"
+                      >
+                        {formData.vendorName || 'Select vendor...'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0 bg-popover">
+                      <Command>
+                        <CommandInput placeholder="Search vendors..." />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="p-2">
+                              <p className="text-sm text-muted-foreground mb-2">
+                                No vendor found
+                              </p>
+                              <Button
+                                size="sm"
+                                className="w-full gap-2"
+                                onClick={() =>
+                                  handleAddNewVendor(formData.vendorName)
+                                }
+                              >
+                                <Plus className="w-4 h-4" />
+                                Add New Vendor
+                              </Button>
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {vendors?.map((vendor) => (
+                              <CommandItem
+                                key={vendor.VendorID}
+                                value={vendor.VendorName}
+                                onSelect={() => handleVendorSelect(vendor)}
+                              >
+                                <Check
+                                  className={cn(
+                                    'mr-2 h-4 w-4',
+                                    formData.vendorId === vendor.VendorID
+                                      ? 'opacity-100'
+                                      : 'opacity-0'
+                                  )}
+                                />
+                                {vendor.VendorName}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <p className="text-sm py-2 px-3 bg-muted rounded-md">{formData.vendorName || '-'}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Invoice Details */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
             <h2 className="font-semibold mb-4">Invoice Details</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Invoice Number</Label>
-                <Input
-                  value={formData.invoiceNumber}
-                  onChange={(e) =>
-                    setFormData({ ...formData, invoiceNumber: e.target.value })
-                  }
-                />
+                {isEditable ? (
+                  <Input
+                    value={formData.invoiceNumber}
+                    onChange={(e) =>
+                      setFormData({ ...formData, invoiceNumber: e.target.value })
+                    }
+                  />
+                ) : (
+                  <p className="text-sm py-2 px-3 bg-muted rounded-md">{formData.invoiceNumber || '-'}</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label>Invoice Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !formData.invoiceDate && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.invoiceDate
-                        ? format(formData.invoiceDate, 'PPP')
-                        : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-popover">
-                    <Calendar
-                      mode="single"
-                      selected={formData.invoiceDate}
-                      onSelect={(date) =>
-                        date && setFormData({ ...formData, invoiceDate: date })
-                      }
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Vendor</Label>
-                <Popover open={vendorOpen} onOpenChange={setVendorOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={vendorOpen}
-                      className="w-full justify-between"
-                    >
-                      {formData.vendorName || 'Select vendor...'}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0 bg-popover">
-                    <Command>
-                      <CommandInput placeholder="Search vendors..." />
-                      <CommandList>
-                        <CommandEmpty>
-                          <div className="p-2">
-                            <p className="text-sm text-muted-foreground mb-2">
-                              No vendor found
-                            </p>
-                            <Button
-                              size="sm"
-                              className="w-full gap-2"
-                              onClick={() =>
-                                handleAddNewVendor(formData.vendorName)
-                              }
-                            >
-                              <Plus className="w-4 h-4" />
-                              Add New Vendor
-                            </Button>
-                          </div>
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {vendors?.map((vendor) => (
-                            <CommandItem
-                              key={vendor.VendorID}
-                              value={vendor.VendorName}
-                              onSelect={() => handleVendorSelect(vendor)}
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4',
-                                  formData.vendorId === vendor.VendorID
-                                    ? 'opacity-100'
-                                    : 'opacity-0'
-                                )}
-                              />
-                              {vendor.VendorName}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                {isEditable ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !formData.invoiceDate && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.invoiceDate
+                          ? format(formData.invoiceDate, 'PPP')
+                          : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-popover">
+                      <Calendar
+                        mode="single"
+                        selected={formData.invoiceDate}
+                        onSelect={(date) =>
+                          date && setFormData({ ...formData, invoiceDate: date })
+                        }
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <p className="text-sm py-2 px-3 bg-muted rounded-md">
+                    {formData.invoiceDate ? format(formData.invoiceDate, 'PPP') : '-'}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label>Currency</Label>
-                <Select
-                  value={formData.currencyCode}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, currencyCode: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
-                    {CURRENCIES.map((currency) => (
-                      <SelectItem key={currency} value={currency}>
-                        {currency}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isEditable ? (
+                  <Select
+                    value={formData.currencyCode}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, currencyCode: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      {CURRENCIES.map((currency) => (
+                        <SelectItem key={currency} value={currency}>
+                          {currency}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm py-2 px-3 bg-muted rounded-md">{formData.currencyCode}</p>
+                )}
               </div>
 
-              <div className="space-y-2 col-span-2">
+              <div className="space-y-2">
                 <Label>Category</Label>
-                <Select
-                  value={formData.categoryId.toString()}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, categoryId: parseInt(value) })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
-                    {categories?.map((cat) => (
-                      <SelectItem
-                        key={cat.CategoryID}
-                        value={cat.CategoryID.toString()}
-                      >
-                        {cat.CategoryName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isEditable ? (
+                  <Select
+                    value={formData.categoryId.toString()}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, categoryId: parseInt(value) })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover">
+                      {categories?.map((cat) => (
+                        <SelectItem
+                          key={cat.CategoryID}
+                          value={cat.CategoryID.toString()}
+                        >
+                          {cat.CategoryName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm py-2 px-3 bg-muted rounded-md">
+                    {categories?.find(c => c.CategoryID === formData.categoryId)?.CategoryName || '-'}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -504,94 +655,121 @@ export default function InvoiceDetail() {
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold">Line Items</h2>
-              <Button variant="outline" size="sm" onClick={addItem}>
-                <Plus className="w-4 h-4 mr-1" />
-                Add Item
-              </Button>
+              {isEditable && (
+                <Button variant="outline" size="sm" onClick={addItem}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Item
+                </Button>
+              )}
             </div>
 
-            <div className="space-y-4">
-              {items.map((item, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/30 rounded-lg"
-                >
-                  <div className="col-span-4 space-y-1">
-                    <Label className="text-xs">Description</Label>
-                    <Input
-                      value={item.ItemDescription}
-                      onChange={(e) =>
-                        updateItem(index, 'ItemDescription', e.target.value)
-                      }
-                      placeholder="Item description"
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">Qty</Label>
-                    <Input
-                      type="number"
-                      value={item.Quantity}
-                      onChange={(e) =>
-                        updateItem(index, 'Quantity', parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">Unit</Label>
-                    <Select
-                      value={item.UnitOfMeasure}
-                      onValueChange={(value) =>
-                        updateItem(index, 'UnitOfMeasure', value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover">
-                        {UNITS.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">Unit Price</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      value={item.UnitPrice}
-                      onChange={(e) =>
-                        updateItem(index, 'UnitPrice', parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </div>
-                  <div className="col-span-1 space-y-1">
-                    <Label className="text-xs">Total</Label>
-                    <p className="h-10 flex items-center font-medium text-sm">
-                      {item.TotalPrice?.toFixed(3)}
-                    </p>
-                  </div>
-                  <div className="col-span-1 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeItem(index)}
-                      disabled={items.length === 1}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-2 font-medium">Description</th>
+                    <th className="text-right py-2 px-2 font-medium w-20">Qty</th>
+                    <th className="text-left py-2 px-2 font-medium w-20">Unit</th>
+                    <th className="text-right py-2 px-2 font-medium w-28">Unit Price</th>
+                    <th className="text-right py-2 px-2 font-medium w-28">Total</th>
+                    {isEditable && <th className="w-10"></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => (
+                    <tr key={index} className="border-b last:border-0">
+                      <td className="py-2 px-2">
+                        {isEditable ? (
+                          <Input
+                            value={item.ItemDescription}
+                            onChange={(e) =>
+                              updateItem(index, 'ItemDescription', e.target.value)
+                            }
+                            placeholder="Item description"
+                            className="h-8"
+                          />
+                        ) : (
+                          item.ItemDescription
+                        )}
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        {isEditable ? (
+                          <Input
+                            type="number"
+                            value={item.Quantity}
+                            onChange={(e) =>
+                              updateItem(index, 'Quantity', parseFloat(e.target.value) || 0)
+                            }
+                            className="h-8 w-20 text-right"
+                          />
+                        ) : (
+                          item.Quantity
+                        )}
+                      </td>
+                      <td className="py-2 px-2">
+                        {isEditable ? (
+                          <Select
+                            value={item.UnitOfMeasure}
+                            onValueChange={(value) =>
+                              updateItem(index, 'UnitOfMeasure', value)
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover">
+                              {UNITS.map((unit) => (
+                                <SelectItem key={unit} value={unit}>
+                                  {unit}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          item.UnitOfMeasure
+                        )}
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        {isEditable ? (
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={item.UnitPrice}
+                            onChange={(e) =>
+                              updateItem(index, 'UnitPrice', parseFloat(e.target.value) || 0)
+                            }
+                            className="h-8 w-28 text-right"
+                          />
+                        ) : (
+                          item.UnitPrice?.toFixed(3)
+                        )}
+                      </td>
+                      <td className="py-2 px-2 text-right font-medium">
+                        {item.TotalPrice?.toFixed(3)}
+                      </td>
+                      {isEditable && (
+                        <td className="py-2 px-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(index)}
+                            disabled={items.length === 1}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
           {/* Totals */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-            <h2 className="font-semibold mb-4">Totals</h2>
+            <h2 className="font-semibold mb-4">Amount Summary</h2>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <Label>Subtotal</Label>
@@ -601,37 +779,49 @@ export default function InvoiceDetail() {
               </div>
               <div className="flex justify-between items-center gap-4">
                 <Label>Tax Amount</Label>
-                <Input
-                  type="number"
-                  step="0.001"
-                  value={formData.taxAmount}
-                  onChange={(e) => {
-                    const tax = parseFloat(e.target.value) || 0;
-                    setFormData((prev) => ({
-                      ...prev,
-                      taxAmount: tax,
-                      totalAmount: prev.subTotal + tax - prev.discountAmount,
-                    }));
-                  }}
-                  className="w-32 text-right"
-                />
+                {isEditable ? (
+                  <Input
+                    type="number"
+                    step="0.001"
+                    value={formData.taxAmount}
+                    onChange={(e) => {
+                      const tax = parseFloat(e.target.value) || 0;
+                      setFormData((prev) => ({
+                        ...prev,
+                        taxAmount: tax,
+                        totalAmount: prev.subTotal + tax - prev.discountAmount,
+                      }));
+                    }}
+                    className="w-32 text-right"
+                  />
+                ) : (
+                  <p className="font-medium">
+                    {formData.currencyCode} {formData.taxAmount.toFixed(3)}
+                  </p>
+                )}
               </div>
               <div className="flex justify-between items-center gap-4">
                 <Label>Discount Amount</Label>
-                <Input
-                  type="number"
-                  step="0.001"
-                  value={formData.discountAmount}
-                  onChange={(e) => {
-                    const discount = parseFloat(e.target.value) || 0;
-                    setFormData((prev) => ({
-                      ...prev,
-                      discountAmount: discount,
-                      totalAmount: prev.subTotal + prev.taxAmount - discount,
-                    }));
-                  }}
-                  className="w-32 text-right"
-                />
+                {isEditable ? (
+                  <Input
+                    type="number"
+                    step="0.001"
+                    value={formData.discountAmount}
+                    onChange={(e) => {
+                      const discount = parseFloat(e.target.value) || 0;
+                      setFormData((prev) => ({
+                        ...prev,
+                        discountAmount: discount,
+                        totalAmount: prev.subTotal + prev.taxAmount - discount,
+                      }));
+                    }}
+                    className="w-32 text-right"
+                  />
+                ) : (
+                  <p className="font-medium">
+                    {formData.currencyCode} {formData.discountAmount.toFixed(3)}
+                  </p>
+                )}
               </div>
               <div className="border-t pt-3">
                 <div className="flex justify-between items-center">
@@ -647,14 +837,20 @@ export default function InvoiceDetail() {
           {/* Notes */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-6">
             <h2 className="font-semibold mb-4">Notes</h2>
-            <Textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              placeholder="Add any notes or comments..."
-              rows={3}
-            />
+            {isEditable ? (
+              <Textarea
+                value={formData.notes}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
+                placeholder="Add any notes or comments..."
+                rows={3}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {formData.notes || 'No notes'}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -671,6 +867,53 @@ export default function InvoiceDetail() {
           }));
         }}
       />
+
+      {/* Action Confirmation Dialog */}
+      <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === 'approve' && 'Approve Invoice'}
+              {actionType === 'reject' && 'Reject Invoice'}
+              {actionType === 'correction' && 'Request Correction'}
+            </DialogTitle>
+            <DialogDescription>
+              {actionType === 'approve' && 'Are you sure you want to approve this invoice?'}
+              {actionType === 'reject' && 'Please provide a reason for rejecting this invoice.'}
+              {actionType === 'correction' && 'Please describe the corrections needed.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Comment {(actionType === 'reject' || actionType === 'correction') && '(Required)'}</Label>
+            <Textarea
+              value={actionComment}
+              onChange={(e) => setActionComment(e.target.value)}
+              placeholder="Enter your comment..."
+              rows={3}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmAction}
+              disabled={
+                approveMutation.isPending ||
+                ((actionType === 'reject' || actionType === 'correction') && !actionComment.trim())
+              }
+              variant={actionType === 'reject' ? 'destructive' : 'default'}
+              className={actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}
+            >
+              {approveMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
