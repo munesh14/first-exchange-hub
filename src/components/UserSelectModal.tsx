@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Building2, User as UserIcon, AlertCircle, Loader2 } from 'lucide-react';
+import feLogo from '@/assets/fe_logo.png';
 
 export function UserSelectModal() {
   const { isUserModalOpen, setIsUserModalOpen, setCurrentUser, currentUser } = useUser();
@@ -37,10 +38,18 @@ export function UserSelectModal() {
   }, [currentUser]);
 
   const handleConfirm = () => {
+    console.log('Continue clicked, selectedUserId:', selectedUserId);
+    console.log('Available users:', users);
+    
     const user = users?.find((u) => u.UserID.toString() === selectedUserId);
+    console.log('Found user:', user);
+    
     if (user) {
+      console.log('Setting current user and closing modal:', user.FullName);
       setCurrentUser(user);
       setIsUserModalOpen(false);
+    } else {
+      console.error('No user found for selectedUserId:', selectedUserId);
     }
   };
 
@@ -49,14 +58,14 @@ export function UserSelectModal() {
   return (
     <Dialog open={isUserModalOpen} onOpenChange={setIsUserModalOpen}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <UserIcon className="w-5 h-5 text-primary-foreground" />
-            </div>
+<DialogHeader>
+          <div className="flex justify-center mb-4">
+            <img src={feLogo} alt="First Exchange LLC" className="h-12 w-auto" />
+          </div>
+          <DialogTitle className="flex items-center justify-center gap-2 text-xl">
             Who are you?
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-center">
             Select your name to continue to the Invoice System
           </DialogDescription>
         </DialogHeader>
