@@ -161,7 +161,7 @@ export default function Dashboard() {
                   <tr key={invoice.InvoiceID}>
                     <td>
                       <Link
-                        to={`/invoice/${invoice.InvoiceUUID}`}
+                        to={`/invoices/${invoice.InvoiceUUID}`}
                         className="font-medium text-primary hover:underline"
                       >
                         {invoice.InvoiceNumber}
@@ -185,7 +185,7 @@ export default function Dashboard() {
                       <StatusBadge status={invoice.StatusCode} />
                     </td>
                     <td>
-                      <Link to={`/invoice/${invoice.InvoiceUUID}`}>
+                      <Link to={`/invoices/${invoice.InvoiceUUID}`}>
                         <Button variant="ghost" size="sm">
                           View
                         </Button>

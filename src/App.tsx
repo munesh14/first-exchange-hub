@@ -29,7 +29,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/upload" element={<UploadInvoice />} />
               <Route path="/invoices" element={<InvoiceList />} />
-              <Route path="/invoice/:uuid" element={<InvoiceDetail />} />
+              <Route path="/invoices/:invoiceUuid" element={<InvoiceDetail />} />
               <Route path="/pending" element={<PendingReview />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/assets" element={<AssetList />} />
