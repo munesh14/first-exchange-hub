@@ -118,6 +118,7 @@ export interface Invoice {
   CreatedAt?: string;
   FileURL?: string;
   FileType?: string;
+  StoredFilePath?: string;
 }
 
 export interface InvoiceDetail {
@@ -253,6 +254,9 @@ export const api = {
   },
   
   getInvoice: (uuid: string) => apiCall<InvoiceDetail>(`/invoice-api/get-invoice?uuid=${uuid}`),
+  
+  getInvoiceFile: (path: string) => 
+    apiCall<{ success: boolean; fileName: string; mimeType: string; data: string }>(`/invoice-api/file?path=${encodeURIComponent(path)}`),
   
   uploadInvoice: (data: {
     file: string;
