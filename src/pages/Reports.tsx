@@ -131,7 +131,7 @@ export default function Reports() {
     const summaryData = report.summary.map((s) => ({
       Department: s.DepartmentName,
       'Invoice Count': s.InvoiceCount,
-      'Total Amount (OMR)': s.TotalAmountOMR.toFixed(3),
+      'Total Amount': s.TotalAmountOMR.toFixed(3),
     }));
     const summaryWs = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
@@ -141,7 +141,7 @@ export default function Reports() {
       Department: c.DepartmentName,
       Category: c.CategoryName,
       'Invoice Count': c.InvoiceCount,
-      'Total Amount (OMR)': c.TotalAmountOMR.toFixed(3),
+      'Total Amount': c.TotalAmountOMR.toFixed(3),
     }));
     const categoryWs = XLSX.utils.json_to_sheet(categoryData);
     XLSX.utils.book_append_sheet(wb, categoryWs, 'By Category');
@@ -151,7 +151,7 @@ export default function Reports() {
       Department: v.DepartmentName,
       Vendor: v.VendorName,
       'Invoice Count': v.InvoiceCount,
-      'Total Amount (OMR)': v.TotalAmountOMR.toFixed(3),
+      'Total Amount': v.TotalAmountOMR.toFixed(3),
     }));
     const vendorWs = XLSX.utils.json_to_sheet(vendorData);
     XLSX.utils.book_append_sheet(wb, vendorWs, 'By Vendor');
@@ -191,12 +191,12 @@ export default function Reports() {
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
     doc.text(`Total Invoices: ${report.totalInvoices}`, 14, 45);
-    doc.text(`Total Amount: OMR ${report.totalAmountOMR.toFixed(3)}`, 14, 52);
+    doc.text(`Total Amount: ${report.totalAmountOMR.toFixed(3)}`, 14, 52);
 
     // Summary table
     autoTable(doc, {
       startY: 60,
-      head: [['Department', 'Invoice Count', 'Total Amount (OMR)']],
+      head: [['Department', 'Invoice Count', 'Total Amount']],
       body: report.summary.map((s) => [
         s.DepartmentName,
         s.InvoiceCount.toString(),
@@ -213,7 +213,7 @@ export default function Reports() {
 
     autoTable(doc, {
       startY: finalY + 5,
-      head: [['Category', 'Invoice Count', 'Total Amount (OMR)']],
+      head: [['Category', 'Invoice Count', 'Total Amount']],
       body: report.byCategory.map((c) => [
         c.CategoryName,
         c.InvoiceCount.toString(),
@@ -399,7 +399,7 @@ export default function Reports() {
                   </div>
                   <div>
                     <p className="text-3xl font-bold">
-                      OMR {report.totalAmountOMR.toLocaleString('en-OM', { minimumFractionDigits: 3 })}
+                      {report.totalAmountOMR.toLocaleString('en-OM', { minimumFractionDigits: 3 })}
                     </p>
                     <p className="text-sm text-muted-foreground">Total Amount</p>
                   </div>
@@ -422,7 +422,7 @@ export default function Reports() {
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value: number) => [`OMR ${value.toFixed(3)}`, 'Amount']}
+                        formatter={(value: number) => [value.toFixed(3), 'Amount']}
                       />
                       <Bar dataKey="value" fill="hsl(175, 58%, 39%)" radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -458,7 +458,7 @@ export default function Reports() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value: number) => [`OMR ${value.toFixed(3)}`, 'Amount']}
+                        formatter={(value: number) => [value.toFixed(3), 'Amount']}
                       />
                     </RechartsPie>
                   </ResponsiveContainer>
@@ -478,7 +478,7 @@ export default function Reports() {
                       <th>Vendor</th>
                       <th>Department</th>
                       <th>Invoice Count</th>
-                      <th>Total Amount (OMR)</th>
+                      <th>Total Amount</th>
                     </tr>
                   </thead>
                   <tbody>
