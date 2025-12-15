@@ -101,10 +101,24 @@ export default function InvoiceDetail() {
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'correction' | null>(null);
   const [actionComment, setActionComment] = useState('');
+  const [omrAmount, setOmrAmount] = useState<number>(0);
   const [fileData, setFileData] = useState<string | null>(null);
   const [fileMimeType, setFileMimeType] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState(false);
+
+  // Calculate suggested OMR amount based on currency
+  const calculateOmrAmount = (amount: number, currency: string): number => {
+    const rates: Record<string, number> = {
+      USD: 0.385,
+      EUR: 0.42,
+      GBP: 0.49,
+      INR: 0.0046,
+      OMR: 1,
+    };
+    const rate = rates[currency] || 0.385; // Default to USD rate
+    return Number((amount * rate).toFixed(3));
+  };
 
   const { data: invoiceData, isLoading } = useQuery({
     queryKey: ['invoice', invoiceUuid],
@@ -241,6 +255,7 @@ export default function InvoiceDetail() {
       action,
       userId: currentUser?.UserID || 0,
       comment: actionComment,
+      ...(action === 'approve' && { omrAmount }),
     }),
     onSuccess: (_, action) => {
       queryClient.invalidateQueries({ queryKey: ['invoice', invoiceUuid] });
@@ -256,6 +271,7 @@ export default function InvoiceDetail() {
       });
       setActionDialogOpen(false);
       setActionComment('');
+      setOmrAmount(0);
       navigate('/invoices');
     },
     onError: (error) => {
@@ -278,6 +294,13 @@ export default function InvoiceDetail() {
 
   const handleAction = (action: 'approve' | 'reject' | 'correction') => {
     setActionType(action);
+    if (action === 'approve' && invoiceData?.invoice) {
+      const suggestedAmount = calculateOmrAmount(
+        invoiceData.invoice.TotalAmount || 0,
+        invoiceData.invoice.CurrencyCode || 'USD'
+      );
+      setOmrAmount(suggestedAmount);
+    }
     setActionDialogOpen(true);
   };
 
@@ -952,15 +975,30 @@ export default function InvoiceDetail() {
               {actionType === 'correction' && 'Please describe the corrections needed.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label>Comment {(actionType === 'reject' || actionType === 'correction') && '(Required)'}</Label>
-            <Textarea
-              value={actionComment}
-              onChange={(e) => setActionComment(e.target.value)}
-              placeholder="Enter your comment..."
-              rows={3}
-              className="mt-2"
-            />
+          <div className="py-4 space-y-4">
+            {actionType === 'approve' && (
+              <div className="space-y-2">
+                <Label>Amount in OMR</Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  value={omrAmount}
+                  onChange={(e) => setOmrAmount(parseFloat(e.target.value) || 0)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Original: {invoice?.CurrencyCode} {invoice?.TotalAmount?.toFixed(2)}
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Comment {(actionType === 'reject' || actionType === 'correction') && '(Required)'}</Label>
+              <Textarea
+                value={actionComment}
+                onChange={(e) => setActionComment(e.target.value)}
+                placeholder="Enter your comment..."
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActionDialogOpen(false)}>

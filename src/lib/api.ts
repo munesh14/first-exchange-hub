@@ -273,7 +273,7 @@ export const api = {
   submitInvoice: (data: { invoiceUuid: string; userId: number; comment?: string }) =>
     apiCall<{ success: boolean }>('/invoice-api/invoice/submit', { method: 'POST', body: data }),
   
-  approveInvoice: (data: { invoiceUuid: string; action: 'approve' | 'reject' | 'correction'; userId: number; comment?: string }) =>
+  approveInvoice: (data: { invoiceUuid: string; action: 'approve' | 'reject' | 'correction'; userId: number; comment?: string; omrAmount?: number }) =>
     apiCall<{ success: boolean }>('/invoice-api/invoice/approve', { method: 'POST', body: data }),
   
   // Reports
