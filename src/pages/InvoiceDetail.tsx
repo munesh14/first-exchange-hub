@@ -713,7 +713,7 @@ export default function InvoiceDetail() {
                   </Select>
                 ) : (
                   <p className="text-sm py-2 px-3 bg-muted rounded-md">
-                    {categories?.find(c => c.CategoryID === formData.categoryId)?.CategoryName || '-'}
+                    {invoice?.CategoryName || '-'}
                   </p>
                 )}
               </div>

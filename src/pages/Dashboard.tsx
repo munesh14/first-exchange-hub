@@ -53,35 +53,35 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <StatCard
           title="Pending Review"
-          value={statsLoading ? '...' : stats?.pendingReview || 0}
+          value={statsLoading ? '...' : stats?.PendingReview || 0}
           icon={<Clock className="w-6 h-6" />}
           iconBgColor="bg-yellow-100"
           iconColor="text-yellow-600"
         />
         <StatCard
           title="Pending Approval"
-          value={statsLoading ? '...' : stats?.pendingApproval || 0}
+          value={statsLoading ? '...' : stats?.PendingApproval || 0}
           icon={<FileCheck className="w-6 h-6" />}
           iconBgColor="bg-blue-100"
           iconColor="text-blue-600"
         />
         <StatCard
           title="Approved"
-          value={statsLoading ? '...' : stats?.approved || 0}
+          value={statsLoading ? '...' : stats?.Approved || 0}
           icon={<CheckCircle className="w-6 h-6" />}
           iconBgColor="bg-green-100"
           iconColor="text-green-600"
         />
         <StatCard
           title="Rejected"
-          value={statsLoading ? '...' : stats?.rejected || 0}
+          value={statsLoading ? '...' : stats?.Rejected || 0}
           icon={<XCircle className="w-6 h-6" />}
           iconBgColor="bg-red-100"
           iconColor="text-red-600"
         />
         <StatCard
           title="Correction Needed"
-          value={statsLoading ? '...' : stats?.correctionNeeded || 0}
+          value={statsLoading ? '...' : stats?.CorrectionNeeded || 0}
           icon={<AlertTriangle className="w-6 h-6" />}
           iconBgColor="bg-orange-100"
           iconColor="text-orange-600"
@@ -91,7 +91,7 @@ export default function Dashboard() {
           value={
             statsLoading
               ? '...'
-              : `${(stats?.totalApprovedAmount || 0).toLocaleString('en-OM', {
+              : `${(stats?.TotalApprovedOMR || 0).toLocaleString('en-OM', {
                   minimumFractionDigits: 3,
                   maximumFractionDigits: 3,
                 })}`

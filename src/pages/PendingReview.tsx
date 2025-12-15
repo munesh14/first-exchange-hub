@@ -87,7 +87,7 @@ export default function PendingReview() {
                   <tr key={invoice.InvoiceID}>
                     <td>
                       <Link
-                        to={`/invoice/${invoice.InvoiceUUID}`}
+                        to={`/invoices/${invoice.InvoiceUUID}`}
                         className="font-medium text-primary hover:underline"
                       >
                         {invoice.InvoiceNumber}
@@ -114,7 +114,7 @@ export default function PendingReview() {
                       {invoice.UploadedBy || '-'}
                     </td>
                     <td>
-                      <Link to={`/invoice/${invoice.InvoiceUUID}`}>
+                      <Link to={`/invoices/${invoice.InvoiceUUID}`}>
                         <Button variant="default" size="sm" className="gap-1.5">
                           <Eye className="w-4 h-4" />
                           Review
