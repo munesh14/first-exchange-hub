@@ -56,6 +56,7 @@ import {
   CheckCircle,
   XCircle,
   RotateCcw,
+  Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -100,6 +101,10 @@ export default function InvoiceDetail() {
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'correction' | null>(null);
   const [actionComment, setActionComment] = useState('');
+  const [fileData, setFileData] = useState<string | null>(null);
+  const [fileMimeType, setFileMimeType] = useState<string | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileError, setFileError] = useState(false);
 
   const { data: invoiceData, isLoading } = useQuery({
     queryKey: ['invoice', invoiceUuid],
@@ -149,6 +154,27 @@ export default function InvoiceDetail() {
               },
             ]
       );
+
+      // Fetch file if StoredFilePath exists
+      if (invoice.StoredFilePath) {
+        setFileLoading(true);
+        setFileError(false);
+        api.getInvoiceFile(invoice.StoredFilePath)
+          .then((result) => {
+            if (result.success) {
+              setFileData(result.data);
+              setFileMimeType(result.mimeType);
+            } else {
+              setFileError(true);
+            }
+          })
+          .catch(() => {
+            setFileError(true);
+          })
+          .finally(() => {
+            setFileLoading(false);
+          });
+      }
     }
   }, [invoiceData]);
 
@@ -318,6 +344,31 @@ export default function InvoiceDetail() {
     setVendorOpen(false);
   };
 
+  const handleDownload = () => {
+    if (!fileData || !fileMimeType) return;
+    
+    const byteCharacters = atob(fileData);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: fileMimeType });
+    
+    const extension = fileMimeType === 'application/pdf' ? 'pdf' : 
+                      fileMimeType === 'image/png' ? 'png' : 'jpg';
+    const fileName = `${invoice?.InvoiceNumber || 'invoice'}.${extension}`;
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -434,24 +485,42 @@ export default function InvoiceDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Document Preview */}
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-border bg-muted/30">
+          <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
             <h2 className="font-semibold">Original Document</h2>
+            {fileData && (
+              <Button variant="outline" size="sm" onClick={handleDownload} className="gap-2">
+                <Download className="w-4 h-4" />
+                Download
+              </Button>
+            )}
           </div>
           <div className="p-4 min-h-[500px] bg-muted/10">
-            {invoice.FileURL ? (
-              isImage ? (
-                <img
-                  src={invoice.FileURL}
-                  alt="Invoice"
-                  className="max-w-full h-auto rounded-lg border border-border"
-                />
-              ) : (
-                <iframe
-                  src={invoice.FileURL}
-                  title="Invoice PDF"
-                  className="w-full h-[600px] rounded-lg border border-border"
-                />
-              )
+            {fileLoading ? (
+              <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  Loading document...
+                </div>
+              </div>
+            ) : fileError ? (
+              <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+                <div className="text-center">
+                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>Preview not available</p>
+                </div>
+              </div>
+            ) : fileData && fileMimeType === 'application/pdf' ? (
+              <iframe
+                src={`data:application/pdf;base64,${fileData}`}
+                title="Invoice PDF"
+                className="w-full h-[600px] rounded-lg border border-border"
+              />
+            ) : fileData && (fileMimeType === 'image/png' || fileMimeType === 'image/jpeg') ? (
+              <img
+                src={`data:${fileMimeType};base64,${fileData}`}
+                alt="Invoice"
+                className="max-w-full h-auto rounded-lg border border-border"
+              />
             ) : (
               <div className="flex items-center justify-center h-[400px] text-muted-foreground">
                 <div className="text-center">
