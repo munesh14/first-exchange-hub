@@ -1,0 +1,29 @@
+# First Exchange Hub - Standalone Docker Compose
+# This runs INDEPENDENTLY from the main docker-setup
+# It connects to the existing n8n-net network for API access
+
+version: '3.8'
+
+services:
+  fe-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fe-dashboard
+    restart: unless-stopped
+    ports:
+      - "3004:80"
+    networks:
+      n8n-net:
+        ipv4_address: 172.30.0.90
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  n8n-net:
+    external: true
+    name: docker-setup_n8n-net

@@ -27,6 +27,7 @@ import {
   Filter,
   Upload,
   Eye,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -54,12 +55,12 @@ export default function InvoiceList() {
     to: Date | undefined;
   }>({ from: undefined, to: undefined });
 
-  const { data: departments } = useQuery({
+  const { data: departments, refetch: refetchDepartments } = useQuery({
     queryKey: ['departments'],
     queryFn: api.getDepartments,
   });
 
-  const { data: invoices, isLoading } = useQuery({
+  const { data: invoices, isLoading, refetch: refetchInvoices, isFetching } = useQuery({
     queryKey: ['invoices', statusFilter, departmentFilter],
     queryFn: () =>
       api.getInvoices({
@@ -67,6 +68,11 @@ export default function InvoiceList() {
         department: departmentFilter !== 'all' ? departmentFilter : undefined,
       }),
   });
+
+  const handleRefresh = () => {
+    refetchDepartments();
+    refetchInvoices();
+  };
 
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
@@ -125,12 +131,18 @@ export default function InvoiceList() {
         description="View and manage all invoices in the system"
         breadcrumbs={[{ label: 'All Invoices' }]}
         actions={
-          <Link to="/upload">
-            <Button className="gap-2">
-              <Upload className="w-4 h-4" />
-              Upload Invoice
+          <>
+            <Button variant="outline" onClick={handleRefresh} disabled={isFetching} className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-          </Link>
+            <Link to="/upload">
+              <Button className="gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Invoice
+              </Button>
+            </Link>
+          </>
         }
       />
 

@@ -24,6 +24,7 @@ import {
   Search,
   Eye,
   FileText,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -53,17 +54,17 @@ export default function AssetList() {
     return <Navigate to="/" replace />;
   }
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats, isFetching: statsFetching } = useQuery({
     queryKey: ['assetStats'],
     queryFn: api.getAssetStats,
   });
 
-  const { data: departments } = useQuery({
+  const { data: departments, refetch: refetchDepartments } = useQuery({
     queryKey: ['departments'],
     queryFn: api.getDepartments,
   });
 
-  const { data: assets, isLoading: assetsLoading } = useQuery({
+  const { data: assets, isLoading: assetsLoading, refetch: refetchAssets, isFetching: assetsFetching } = useQuery({
     queryKey: ['assets', statusFilter, departmentFilter, categoryFilter],
     queryFn: () =>
       api.getAssets({
@@ -72,6 +73,14 @@ export default function AssetList() {
         category: categoryFilter !== 'all' ? categoryFilter : undefined,
       }),
   });
+
+  const isRefreshing = statsFetching || assetsFetching;
+
+  const handleRefresh = () => {
+    refetchStats();
+    refetchDepartments();
+    refetchAssets();
+  };
 
   const filteredAssets = useMemo(() => {
     if (!assets) return [];
@@ -95,6 +104,12 @@ export default function AssetList() {
         title="Asset Register"
         description="Manage and track all company assets"
         breadcrumbs={[{ label: 'Asset Register' }]}
+        actions={
+          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing} className="gap-2">
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
       />
 
       {/* Stats Grid */}

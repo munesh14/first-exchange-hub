@@ -1,0 +1,383 @@
+{
+  "name": "FE Proforma Invoice - API Endpoints",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "proforma-api/upload",
+        "options": { "rawBody": false }
+      },
+      "id": "pf-upload",
+      "name": "POST Upload Proforma",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 100],
+      "webhookId": "pf-upload-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "proforma-api/list",
+        "options": {}
+      },
+      "id": "pf-list",
+      "name": "GET Proforma List",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 400],
+      "webhookId": "pf-list-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "proforma-api/get",
+        "options": {}
+      },
+      "id": "pf-get",
+      "name": "GET Proforma Detail",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 600],
+      "webhookId": "pf-get-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "proforma-api/link-invoice",
+        "options": {}
+      },
+      "id": "pf-link",
+      "name": "POST Link to Invoice",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 800],
+      "webhookId": "pf-link-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate upload\nconst body = $input.first().json.body || {};\nconst files = $input.first().binary || {};\nconst errors = [];\n\nif (!body.departmentId) errors.push('departmentId required');\nif (!body.uploadedBy) errors.push('uploadedBy required');\nif (!files.file) errors.push('file required');\n\nif (errors.length > 0) return [{ json: { valid: false, errors } }];\n\nconst ts = Date.now();\nconst origName = files.file.fileName || 'proforma.pdf';\nconst ext = origName.split('.').pop();\nconst storedName = `proforma_${ts}.${ext}`;\nconst storedPath = `/data/proforma/${new Date().getFullYear()}/${String(new Date().getMonth()+1).padStart(2,'0')}`;\n\nreturn [{ json: { valid: true, ...body, originalFileName: origName, storedFileName: storedName, storedPath, fileType: files.file.mimeType || 'application/pdf' }, binary: files }];"
+      },
+      "id": "pf-upload-validate",
+      "name": "Validate Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "check", "leftValue": "={{ $json.valid }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "pf-upload-check",
+      "name": "Check Valid Upload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Validation failed', details: $json.errors } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "pf-upload-error",
+      "name": "Respond Upload Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "command": "=mkdir -p {{ $json.storedPath }}"
+      },
+      "id": "pf-mkdir",
+      "name": "Create Directory",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [920, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst data = $input.first();\nconst filePath = path.join(data.json.storedPath, data.json.storedFileName);\nconst fullPath = `/data/uploads${filePath}`;\nfs.mkdirSync(path.dirname(fullPath), { recursive: true });\nfs.writeFileSync(fullPath, Buffer.from(data.binary.file.data, 'base64'));\nreturn [{ json: { ...data.json, fullFilePath: fullPath, relativeFilePath: filePath }, binary: data.binary }];"
+      },
+      "id": "pf-save-file",
+      "name": "Save File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Extract proforma invoice data as JSON: proformaNumber, proformaDate (YYYY-MM-DD), vendorName, vendorTRN, vendorAddress, currencyCode (default OMR), subTotal, vatAmount, vatPercentage, discountAmount, totalAmount, items (array of: lineNumber, description, quantity, unitOfMeasure, unitPrice, totalPrice). Return ONLY valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        { \"type\": \"image_url\", \"image_url\": { \"url\": \"data:{{ $binary.file.mimeType }};base64,{{ $binary.file.data }}\" } },\n        { \"type\": \"text\", \"text\": \"Extract proforma invoice details.\" }\n      ]\n    }\n  ],\n  \"max_tokens\": 4096\n}",
+        "options": {}
+      },
+      "id": "pf-ai-extract",
+      "name": "OpenAI Extract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, 0],
+      "credentials": { "openAiApi": { "id": "YJ1y2GjN9R9eAdrv", "name": "OpenAi account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst prevData = $('Save File').first().json;\ntry {\n  const content = data.choices[0].message.content;\n  const jsonStr = content.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  const ext = JSON.parse(jsonStr);\n  return [{ json: { success: true, extracted: { proformaNumber: ext.proformaNumber || 'PF-'+Date.now(), proformaDate: ext.proformaDate || new Date().toISOString().split('T')[0], vendorName: ext.vendorName || 'Unknown', vendorTRN: ext.vendorTRN, vendorAddress: ext.vendorAddress, currencyCode: ext.currencyCode || 'OMR', subTotal: parseFloat(ext.subTotal)||0, vatAmount: parseFloat(ext.vatAmount)||0, vatPercentage: parseFloat(ext.vatPercentage)||5, discountAmount: parseFloat(ext.discountAmount)||0, totalAmount: parseFloat(ext.totalAmount)||0, items: ext.items||[] }, fileInfo: prevData } }];\n} catch(e) { return [{ json: { success: false, error: e.message } }]; }"
+      },
+      "id": "pf-parse-ai",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DECLARE @VendorID INT;\nSELECT @VendorID = VendorID FROM Vendors WHERE VendorName = '{{ $json.extracted.vendorName }}';\nIF @VendorID IS NULL BEGIN INSERT INTO Vendors (VendorName, TRN, Address, IsActive, CreatedAt) VALUES ('{{ $json.extracted.vendorName }}', '{{ $json.extracted.vendorTRN || '' }}', '{{ $json.extracted.vendorAddress || '' }}', 1, GETDATE()); SET @VendorID = SCOPE_IDENTITY(); END\nSELECT @VendorID AS VendorID;",
+        "options": {}
+      },
+      "id": "pf-check-vendor",
+      "name": "Check/Create Vendor",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1800, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO ProformaInvoices (ProformaNumber, ProformaDate, LPOID, QuotationID, VendorID, VendorName, VendorTRN, VendorAddress, DepartmentID, BranchID, CategoryID, CurrencyCode, SubTotal, VATAmount, VATPercentage, DiscountAmount, TotalAmount, VATClaimable, FilePath, FileName, Status, UploadedBy, Notes, CreatedAt)\nOUTPUT INSERTED.ProformaID, INSERTED.ProformaUUID\nVALUES ('{{ $('Parse AI Response').first().json.extracted.proformaNumber }}', '{{ $('Parse AI Response').first().json.extracted.proformaDate }}', {{ $('Validate Upload').first().json.lpoId || 'NULL' }}, {{ $('Validate Upload').first().json.quotationId || 'NULL' }}, {{ $json[0].VendorID }}, '{{ $('Parse AI Response').first().json.extracted.vendorName }}', '{{ $('Parse AI Response').first().json.extracted.vendorTRN || '' }}', '{{ $('Parse AI Response').first().json.extracted.vendorAddress || '' }}', {{ $('Validate Upload').first().json.departmentId }}, {{ $('Validate Upload').first().json.branchId || 'NULL' }}, {{ $('Validate Upload').first().json.categoryId || 'NULL' }}, '{{ $('Parse AI Response').first().json.extracted.currencyCode }}', {{ $('Parse AI Response').first().json.extracted.subTotal }}, {{ $('Parse AI Response').first().json.extracted.vatAmount }}, {{ $('Parse AI Response').first().json.extracted.vatPercentage }}, {{ $('Parse AI Response').first().json.extracted.discountAmount }}, {{ $('Parse AI Response').first().json.extracted.totalAmount }}, 0, '{{ $('Parse AI Response').first().json.fileInfo.relativeFilePath }}', '{{ $('Parse AI Response').first().json.fileInfo.originalFileName }}', 'RECEIVED', {{ $('Validate Upload').first().json.uploadedBy }}, '{{ $('Validate Upload').first().json.notes || '' }}', GETDATE());",
+        "options": {}
+      },
+      "id": "pf-insert",
+      "name": "Insert Proforma",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2020, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const pfResult = $input.first().json;\nconst pfId = pfResult[0].ProformaID;\nconst items = $('Parse AI Response').first().json.extracted.items || [];\nreturn items.map((item, idx) => ({ json: { proformaId: pfId, lineNumber: item.lineNumber || idx+1, description: item.description || '', quantity: parseFloat(item.quantity)||1, unitOfMeasure: item.unitOfMeasure || 'EA', unitPrice: parseFloat(item.unitPrice)||0, totalPrice: parseFloat(item.totalPrice)||0 } }));"
+      },
+      "id": "pf-prep-items",
+      "name": "Prepare Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 0]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "pf-loop",
+      "name": "Loop Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [2460, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO ProformaInvoiceItems (ProformaID, LineNumber, ItemDescription, Quantity, UnitOfMeasure, UnitPrice, TotalPrice) VALUES ({{ $json.proformaId }}, {{ $json.lineNumber }}, '{{ $json.description.replace(/'/g, \"''\") }}', {{ $json.quantity }}, '{{ $json.unitOfMeasure }}', {{ $json.unitPrice }}, {{ $json.totalPrice }});",
+        "options": {}
+      },
+      "id": "pf-insert-items",
+      "name": "Insert Items",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2680, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.*, d.DepartmentName, b.BranchName, u.FullName AS UploadedByName FROM ProformaInvoices p LEFT JOIN Departments d ON p.DepartmentID = d.DepartmentID LEFT JOIN Branches b ON p.BranchID = b.BranchID LEFT JOIN Users u ON p.UploadedBy = u.UserID WHERE p.ProformaID = {{ $('Insert Proforma').first().json[0].ProformaID }};",
+        "options": {}
+      },
+      "id": "pf-get-summary",
+      "name": "Get Summary",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2900, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Proforma uploaded', proforma: $json[0] } }}",
+        "options": {}
+      },
+      "id": "pf-upload-respond",
+      "name": "Respond Upload Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3120, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nlet where = 'WHERE 1=1';\nif (query.status) where += ` AND p.Status = '${query.status}'`;\nif (query.departmentId) where += ` AND p.DepartmentID = ${query.departmentId}`;\nreturn [{ json: { where, limit: query.limit || 50, offset: query.offset || 0 } }];"
+      },
+      "id": "pf-list-build",
+      "name": "Build List Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.ProformaID, p.ProformaUUID, p.ProformaNumber, p.ProformaDate, p.VendorName, p.CurrencyCode, p.TotalAmount, p.Status, d.DepartmentName, b.BranchName, u.FullName AS UploadedByName, i.InvoiceNumber FROM ProformaInvoices p LEFT JOIN Departments d ON p.DepartmentID = d.DepartmentID LEFT JOIN Branches b ON p.BranchID = b.BranchID LEFT JOIN Users u ON p.UploadedBy = u.UserID LEFT JOIN Invoices i ON p.InvoiceID = i.InvoiceID {{ $json.where }} ORDER BY p.CreatedAt DESC OFFSET {{ $json.offset }} ROWS FETCH NEXT {{ $json.limit }} ROWS ONLY;",
+        "options": {}
+      },
+      "id": "pf-list-query",
+      "name": "Query List",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 400],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, proformas: $json } }}",
+        "options": {}
+      },
+      "id": "pf-list-respond",
+      "name": "Respond List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nif (!query.uuid) return [{ json: { valid: false, error: 'uuid required' } }];\nreturn [{ json: { valid: true, uuid: query.uuid } }];"
+      },
+      "id": "pf-get-validate",
+      "name": "Validate UUID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 600]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.*, d.DepartmentName, b.BranchName, c.CategoryName, u.FullName AS UploadedByName, lpo.LPONumber, i.InvoiceNumber FROM ProformaInvoices p LEFT JOIN Departments d ON p.DepartmentID = d.DepartmentID LEFT JOIN Branches b ON p.BranchID = b.BranchID LEFT JOIN ExpenseCategories c ON p.CategoryID = c.CategoryID LEFT JOIN Users u ON p.UploadedBy = u.UserID LEFT JOIN LocalPurchaseOrders lpo ON p.LPOID = lpo.LPOID LEFT JOIN Invoices i ON p.InvoiceID = i.InvoiceID WHERE p.ProformaUUID = '{{ $json.uuid }}';",
+        "options": {}
+      },
+      "id": "pf-get-detail",
+      "name": "Get Detail",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 600],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT * FROM ProformaInvoiceItems WHERE ProformaID = {{ $json[0].ProformaID }} ORDER BY LineNumber;",
+        "options": {}
+      },
+      "id": "pf-get-items",
+      "name": "Get Items",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 600],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const pf = $('Get Detail').first().json[0];\nconst items = $input.first().json;\nif (!pf) return [{ json: { success: false, error: 'Proforma not found' } }];\nreturn [{ json: { success: true, proforma: { ...pf, items } } }];"
+      },
+      "id": "pf-get-combine",
+      "name": "Combine Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "pf-get-respond",
+      "name": "Respond Detail",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nif (!body.proformaUuid) return [{ json: { valid: false, error: 'proformaUuid required' } }];\nif (!body.invoiceId) return [{ json: { valid: false, error: 'invoiceId required' } }];\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "pf-link-validate",
+      "name": "Validate Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 800]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE ProformaInvoices SET InvoiceID = {{ $json.invoiceId }}, InvoicedAt = GETDATE(), Status = 'INVOICED', UpdatedAt = GETDATE() WHERE ProformaUUID = '{{ $json.proformaUuid }}';\nUPDATE Invoices SET ProformaID = (SELECT ProformaID FROM ProformaInvoices WHERE ProformaUUID = '{{ $json.proformaUuid }}'), UpdatedAt = GETDATE() WHERE InvoiceID = {{ $json.invoiceId }};\nSELECT p.*, i.InvoiceNumber FROM ProformaInvoices p LEFT JOIN Invoices i ON p.InvoiceID = i.InvoiceID WHERE p.ProformaUUID = '{{ $json.proformaUuid }}';",
+        "options": {}
+      },
+      "id": "pf-link-update",
+      "name": "Link Invoice",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 800],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Proforma linked to invoice', proforma: $json[0] } }}",
+        "options": {}
+      },
+      "id": "pf-link-respond",
+      "name": "Respond Link",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 800]
+    }
+  ],
+  "connections": {
+    "POST Upload Proforma": { "main": [[{ "node": "Validate Upload", "type": "main", "index": 0 }]] },
+    "Validate Upload": { "main": [[{ "node": "Check Valid Upload", "type": "main", "index": 0 }]] },
+    "Check Valid Upload": { "main": [[{ "node": "Create Directory", "type": "main", "index": 0 }], [{ "node": "Respond Upload Error", "type": "main", "index": 0 }]] },
+    "Create Directory": { "main": [[{ "node": "Save File", "type": "main", "index": 0 }]] },
+    "Save File": { "main": [[{ "node": "OpenAI Extract", "type": "main", "index": 0 }]] },
+    "OpenAI Extract": { "main": [[{ "node": "Parse AI Response", "type": "main", "index": 0 }]] },
+    "Parse AI Response": { "main": [[{ "node": "Check/Create Vendor", "type": "main", "index": 0 }]] },
+    "Check/Create Vendor": { "main": [[{ "node": "Insert Proforma", "type": "main", "index": 0 }]] },
+    "Insert Proforma": { "main": [[{ "node": "Prepare Items", "type": "main", "index": 0 }]] },
+    "Prepare Items": { "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]] },
+    "Loop Items": { "main": [[{ "node": "Insert Items", "type": "main", "index": 0 }], [{ "node": "Get Summary", "type": "main", "index": 0 }]] },
+    "Insert Items": { "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]] },
+    "Get Summary": { "main": [[{ "node": "Respond Upload Success", "type": "main", "index": 0 }]] },
+    "GET Proforma List": { "main": [[{ "node": "Build List Query", "type": "main", "index": 0 }]] },
+    "Build List Query": { "main": [[{ "node": "Query List", "type": "main", "index": 0 }]] },
+    "Query List": { "main": [[{ "node": "Respond List", "type": "main", "index": 0 }]] },
+    "GET Proforma Detail": { "main": [[{ "node": "Validate UUID", "type": "main", "index": 0 }]] },
+    "Validate UUID": { "main": [[{ "node": "Get Detail", "type": "main", "index": 0 }]] },
+    "Get Detail": { "main": [[{ "node": "Get Items", "type": "main", "index": 0 }]] },
+    "Get Items": { "main": [[{ "node": "Combine Data", "type": "main", "index": 0 }]] },
+    "Combine Data": { "main": [[{ "node": "Respond Detail", "type": "main", "index": 0 }]] },
+    "POST Link to Invoice": { "main": [[{ "node": "Validate Link", "type": "main", "index": 0 }]] },
+    "Validate Link": { "main": [[{ "node": "Link Invoice", "type": "main", "index": 0 }]] },
+    "Link Invoice": { "main": [[{ "node": "Respond Link", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "1",
+  "meta": { "instanceId": "fe-invoice-system" },
+  "tags": []
+}

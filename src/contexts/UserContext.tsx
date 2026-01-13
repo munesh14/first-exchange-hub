@@ -8,6 +8,12 @@ interface UserContextType {
   setIsUserModalOpen: (open: boolean) => void;
   canAccessReports: boolean;
   canAccessAssets: boolean;
+  // LPO Approval Permissions
+  isHOD: boolean;
+  isGM: boolean;
+  isFinalApprover: boolean;  // Ms. Nafha - Final Approving Authority
+  isAccountsHOD: boolean;    // Mr. George - Accounts Department Head
+  canApproveForDepartment: (departmentId: number | null, departmentName?: string | null) => boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -46,6 +52,52 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const canAccessReports = currentUser?.DepartmentID === 1 || currentUser?.DepartmentID === 2;
   const canAccessAssets = currentUser?.DepartmentID === 1 || currentUser?.DepartmentID === 2;
 
+  // =====================================================
+  // LPO Approval Permissions - Updated Hierarchy
+  // =====================================================
+  // Flow: Staff → Dept HOD → GM (>100 OMR) → Final Approver
+  //
+  // UserID 1  = Munesh C (HOD-IT, Admin)
+  // UserID 8  = Ms. Nafha (FINAL_APPROVER - Final Approving Authority)
+  // UserID 9  = Ms. Shamsa (GM - General Manager, approves >100 OMR)
+  // UserID 10 = Mr. George (HOD - Accounts Department Head)
+  // =====================================================
+
+  // Department Heads (can approve for their department)
+  const isHOD = currentUser?.Role === 'HOD' || 
+                currentUser?.Role === 'ADMIN' || 
+                currentUser?.IsDeptHead === true ||
+                currentUser?.UserID === 1 ||   // Munesh (IT HOD)
+                currentUser?.UserID === 10;    // George (Accounts HOD)
+  
+  // General Manager (approves amounts > 100 OMR)
+  const isGM = currentUser?.Role === 'GM' || 
+               currentUser?.UserID === 9;      // Shamsa
+  
+  // Final Approving Authority (final step in approval chain)
+  const isFinalApprover = currentUser?.Role === 'FINAL_APPROVER' || 
+                          currentUser?.UserID === 8;  // Nafha
+  
+  // Accounts Department Head specifically (Mr. George)
+  const isAccountsHOD = (currentUser?.DepartmentID === 2 && currentUser?.IsDeptHead === true) ||
+                        currentUser?.UserID === 10;    // George
+  
+  const canApproveForDepartment = (departmentId: number | null, departmentName?: string | null) => {
+    if (!currentUser) return false;
+    
+    // Final approver can approve any department's LPO at final stage
+    if (isFinalApprover) return true;
+    
+    // GM can approve any department's LPO at GM stage
+    if (isGM) return true;
+    
+    // HOD can only approve their own department
+    if (departmentId && currentUser.DepartmentID === departmentId) return isHOD;
+    if (departmentName && currentUser.DepartmentName === departmentName) return isHOD;
+    
+    return false;
+  };
+
   if (!isInitialized) {
     return null;
   }
@@ -59,6 +111,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setIsUserModalOpen,
         canAccessReports,
         canAccessAssets,
+        isHOD,
+        isGM,
+        isFinalApprover,
+        isAccountsHOD,
+        canApproveForDepartment,
       }}
     >
       {children}

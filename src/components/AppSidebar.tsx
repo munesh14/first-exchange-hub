@@ -12,6 +12,15 @@ import {
   ChevronDown,
   LogOut,
   Building2,
+  ClipboardList,
+  CheckCircle,
+  FileSearch,
+  Truck,
+  Receipt,
+  CreditCard,
+  Wallet,
+  Package,
+  Link2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -27,6 +36,22 @@ const navItems = [
   { path: '/upload', label: 'Upload Invoice', icon: Upload },
   { path: '/invoices', label: 'All Invoices', icon: FileText },
   { path: '/pending', label: 'Pending Review', icon: Clock },
+];
+
+const procurementItems = [
+  { path: '/quotations', label: 'Quotations', icon: FileSearch },
+  { path: '/lpo', label: 'Purchase Orders', icon: ClipboardList },
+  { path: '/lpo/pending', label: 'LPO Approvals', icon: CheckCircle },
+  { path: '/delivery-orders', label: 'Delivery Orders', icon: Truck },
+];
+
+const paymentItems = [
+  { path: '/payments/new', label: 'Record Payment', icon: Wallet },
+  { path: '/payments/pdc', label: 'PDC Tracker', icon: CreditCard },
+];
+
+const assetItems = [
+  { path: '/assets/pending', label: 'Pending Assets', icon: Package },
 ];
 
 const restrictedItems = [
@@ -58,6 +83,7 @@ export function AppSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin">
+        {/* Main Items */}
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -71,7 +97,64 @@ export function AppSidebar() {
           </NavLink>
         ))}
 
-        {/* Restricted Items */}
+        {/* Procurement Section */}
+        <div className="pt-4 pb-2">
+          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            Procurement
+          </p>
+        </div>
+        {procurementItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn('nav-item', isActive && 'nav-item-active')
+            }
+          >
+            <item.icon className="w-5 h-5" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+
+        {/* Payments Section */}
+        <div className="pt-4 pb-2">
+          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            Payments
+          </p>
+        </div>
+        {paymentItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn('nav-item', isActive && 'nav-item-active')
+            }
+          >
+            <item.icon className="w-5 h-5" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+
+        {/* Assets Section */}
+        <div className="pt-4 pb-2">
+          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            Assets
+          </p>
+        </div>
+        {assetItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn('nav-item', isActive && 'nav-item-active')
+            }
+          >
+            <item.icon className="w-5 h-5" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+
+        {/* Administration */}
         {(canAccessReports || canAccessAssets) && (
           <>
             <div className="pt-4 pb-2">

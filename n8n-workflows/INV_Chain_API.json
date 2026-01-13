@@ -1,0 +1,323 @@
+{
+  "name": "INV_Chain_API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chain-api/create",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "create-webhook",
+      "name": "POST /chain-api/create",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "chain-api-create"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DECLARE @ChainNumber VARCHAR(20);\nDECLARE @Year INT = YEAR(GETDATE());\nDECLARE @Sequence INT;\n\nSELECT @Sequence = ISNULL(MAX(CAST(RIGHT(ChainNumber, 4) AS INT)), 0) + 1\nFROM ProcurementChains\nWHERE ChainNumber LIKE 'PC-' + CAST(@Year AS VARCHAR) + '-%';\n\nSET @ChainNumber = 'PC-' + CAST(@Year AS VARCHAR) + '-' + RIGHT('0000' + CAST(@Sequence AS VARCHAR), 4);\n\nSELECT @ChainNumber AS ChainNumber;"
+      },
+      "id": "generate-chain-number",
+      "name": "Generate Chain Number",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": {
+        "microsoftSql": {
+          "id": "1",
+          "name": "MSSQL - FE_InvoiceSystem"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DECLARE @ChainUUID UNIQUEIDENTIFIER = NEWID();\nDECLARE @ChainNumber VARCHAR(20) = '{{ $json.ChainNumber }}';\nDECLARE @Title NVARCHAR(255) = '{{ $('POST /chain-api/create').item.json.body.title }}';\nDECLARE @Description NVARCHAR(MAX) = '{{ $('POST /chain-api/create').item.json.body.description }}';\nDECLARE @VendorID INT = {{ $('POST /chain-api/create').item.json.body.vendorId || 'NULL' }};\nDECLARE @VendorName NVARCHAR(255) = '{{ $('POST /chain-api/create').item.json.body.vendorName }}';\nDECLARE @DepartmentID INT = {{ $('POST /chain-api/create').item.json.body.departmentId }};\nDECLARE @BranchID INT = {{ $('POST /chain-api/create').item.json.body.branchId || 'NULL' }};\nDECLARE @HasQuotation BIT = {{ $('POST /chain-api/create').item.json.body.hasQuotation ? 1 : 0 }};\nDECLARE @HasLPO BIT = {{ $('POST /chain-api/create').item.json.body.hasLPO ? 1 : 0 }};\nDECLARE @HasDeliveryOrder BIT = {{ $('POST /chain-api/create').item.json.body.hasDeliveryOrder ? 1 : 0 }};\nDECLARE @HasProforma BIT = {{ $('POST /chain-api/create').item.json.body.hasProforma ? 1 : 0 }};\nDECLARE @HasInvoice BIT = {{ $('POST /chain-api/create').item.json.body.hasInvoice ? 1 : 0 }};\nDECLARE @IsDirectPurchase BIT = {{ $('POST /chain-api/create').item.json.body.isDirectPurchase ? 1 : 0 }};\nDECLARE @EstimatedAmount DECIMAL(18,3) = {{ $('POST /chain-api/create').item.json.body.estimatedAmount || 'NULL' }};\nDECLARE @CreatedBy INT = {{ $('POST /chain-api/create').item.json.body.createdBy }};\nDECLARE @Notes NVARCHAR(MAX) = '{{ $('POST /chain-api/create').item.json.body.notes }}';\n\nINSERT INTO ProcurementChains (\n    ChainUUID, ChainNumber, Title, Description,\n    VendorID, VendorName, DepartmentID, BranchID,\n    HasQuotation, HasLPO, HasDeliveryOrder, HasProforma, HasInvoice,\n    IsDirectPurchase, TotalEstimatedAmount,\n    StatusID, CurrentStage, CreatedBy, CreatedAt, Notes\n)\nVALUES (\n    @ChainUUID, @ChainNumber, @Title, @Description,\n    @VendorID, @VendorName, @DepartmentID, @BranchID,\n    @HasQuotation, @HasLPO, @HasDeliveryOrder, @HasProforma, @HasInvoice,\n    @IsDirectPurchase, @EstimatedAmount,\n    1, 'DRAFT', @CreatedBy, GETDATE(), @Notes\n);\n\nSELECT\n    ChainID, ChainUUID, ChainNumber, Title, StatusID, CurrentStage\nFROM ProcurementChains\nWHERE ChainUUID = @ChainUUID;"
+      },
+      "id": "insert-chain",
+      "name": "Insert Chain Record",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "credentials": {
+        "microsoftSql": {
+          "id": "1",
+          "name": "MSSQL - FE_InvoiceSystem"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DECLARE @ChainID INT = {{ $json.ChainID }};\nDECLARE @CreatedBy INT = {{ $('POST /chain-api/create').item.json.body.createdBy }};\n\nINSERT INTO ChainActivityLog (\n    ChainID, ActivityType, ActivityDescription,\n    NewStatusID, PerformedBy, PerformedAt\n)\nVALUES (\n    @ChainID, 'CREATED', 'Procurement chain created',\n    1, @CreatedBy, GETDATE()\n);\n\nSELECT 1 AS Success;"
+      },
+      "id": "log-activity",
+      "name": "Log Activity",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "credentials": {
+        "microsoftSql": {
+          "id": "1",
+          "name": "MSSQL - FE_InvoiceSystem"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=CHAIN_NUMBER=\"{{ $('Insert Chain Record').item.json.ChainNumber }}\"\nBASE_DIR=\"/home/munesh/Documents/n8n_projects/procurement_docs/chains\"\n\nmkdir -p \"$BASE_DIR/$CHAIN_NUMBER\"\nmkdir -p \"$BASE_DIR/$CHAIN_NUMBER/quotations\"\nmkdir -p \"$BASE_DIR/$CHAIN_NUMBER/lpos\"\nmkdir -p \"$BASE_DIR/$CHAIN_NUMBER/delivery_orders\"\nmkdir -p \"$BASE_DIR/$CHAIN_NUMBER/proforma\"\nmkdir -p \"$BASE_DIR/$CHAIN_NUMBER/invoices\"\nmkdir -p \"$BASE_DIR/$CHAIN_NUMBER/payments\"\n\necho \"Folders created for chain: $CHAIN_NUMBER\""
+      },
+      "id": "create-folders",
+      "name": "Create Folder Structure",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"data\": {\n    \"chainId\": $('Insert Chain Record').item.json.ChainID,\n    \"chainUuid\": $('Insert Chain Record').item.json.ChainUUID,\n    \"chainNumber\": $('Insert Chain Record').item.json.ChainNumber,\n    \"title\": $('Insert Chain Record').item.json.Title,\n    \"status\": $('Insert Chain Record').item.json.CurrentStage\n  },\n  \"message\": \"Procurement chain created successfully\"\n} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "GET, POST, PUT, DELETE, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "id": "send-create-response",
+      "name": "Send Create Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "chain-api/list",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "list-webhook",
+      "name": "GET /chain-api/list",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 600],
+      "webhookId": "chain-api-list"
+    },
+    {
+      "parameters": {
+        "functionCode": "const params = $input.item.json.query || {};\n\nconst status = params.status || null;\nconst departmentId = params.departmentId ? parseInt(params.departmentId) : null;\nconst vendorId = params.vendorId ? parseInt(params.vendorId) : null;\nconst search = params.search || null;\nconst fromDate = params.fromDate || null;\nconst toDate = params.toDate || null;\nconst limit = params.limit ? parseInt(params.limit) : 20;\nconst offset = params.offset ? parseInt(params.offset) : 0;\n\nlet whereConditions = [];\n\nif (status) {\n  whereConditions.push(`cs.StatusCode = '${status}'`);\n}\n\nif (departmentId) {\n  whereConditions.push(`c.DepartmentID = ${departmentId}`);\n}\n\nif (vendorId) {\n  whereConditions.push(`c.VendorID = ${vendorId}`);\n}\n\nif (search) {\n  const escapedSearch = search.replace(/'/g, \"''\");\n  whereConditions.push(`(c.Title LIKE '%${escapedSearch}%' OR c.Description LIKE '%${escapedSearch}%')`);\n}\n\nif (fromDate) {\n  whereConditions.push(`CAST(c.CreatedAt AS DATE) >= '${fromDate}'`);\n}\n\nif (toDate) {\n  whereConditions.push(`CAST(c.CreatedAt AS DATE) <= '${toDate}'`);\n}\n\nconst whereClause = whereConditions.length > 0\n  ? 'WHERE ' + whereConditions.join(' AND ')\n  : 'WHERE 1=1';\n\nconst mainQuery = `\nSELECT\n  c.ChainID, c.ChainUUID, c.ChainNumber, c.Title, c.Description,\n  c.VendorID, c.VendorName, c.DepartmentID, d.DepartmentName,\n  c.BranchID, c.StatusID, cs.StatusCode, cs.StatusName, cs.ColorCode,\n  c.TotalEstimatedAmount, c.TotalInvoicedAmount, c.TotalPaidAmount, c.BalanceAmount,\n  c.QuotationCount, c.LPOCount, c.DOCount, c.InvoiceCount, c.PaymentCount, c.AssetCount,\n  c.HasQuotation, c.HasLPO, c.HasDeliveryOrder, c.HasProforma, c.HasInvoice,\n  c.IsDirectPurchase, c.CurrentStage, c.CreatedBy, c.CreatedAt, c.UpdatedAt, c.Notes\nFROM ProcurementChains c\nLEFT JOIN Departments d ON c.DepartmentID = d.DepartmentID\nLEFT JOIN ChainStatus cs ON c.StatusID = cs.StatusID\n${whereClause}\nORDER BY c.CreatedAt DESC\nOFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY;\n`;\n\nconst countQuery = `\nSELECT COUNT(*) AS TotalCount\nFROM ProcurementChains c\nLEFT JOIN ChainStatus cs ON c.StatusID = cs.StatusID\n${whereClause};\n`;\n\nreturn {\n  json: {\n    mainQuery: mainQuery,\n    countQuery: countQuery,\n    limit: limit,\n    offset: offset\n  }\n};"
+      },
+      "id": "build-query",
+      "name": "Build Dynamic SQL Query",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 600]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.mainQuery }}"
+      },
+      "id": "get-chains",
+      "name": "Get Chains List",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 2,
+      "position": [680, 600],
+      "credentials": {
+        "microsoftSql": {
+          "id": "1",
+          "name": "MSSQL - FE_InvoiceSystem"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $('Build Dynamic SQL Query').item.json.countQuery }}"
+      },
+      "id": "get-count",
+      "name": "Get Total Count",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 2,
+      "position": [900, 600],
+      "credentials": {
+        "microsoftSql": {
+          "id": "1",
+          "name": "MSSQL - FE_InvoiceSystem"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const chainsData = $('Get Chains List').all();\nconst chains = chainsData.length > 0 ? chainsData.map(item => item.json) : [];\n\nconst countNode = $('Get Total Count').first().json;\nconst totalCount = countNode.TotalCount || 0;\n\nconst params = $('Build Dynamic SQL Query').first().json;\nconst limit = params.limit;\nconst offset = params.offset;\n\nconst formattedChains = chains.map(chain => ({\n  chainId: chain.ChainID,\n  chainUuid: chain.ChainUUID,\n  chainNumber: chain.ChainNumber,\n  title: chain.Title,\n  description: chain.Description || null,\n  vendor: {\n    id: chain.VendorID,\n    name: chain.VendorName\n  },\n  department: {\n    id: chain.DepartmentID,\n    name: chain.DepartmentName\n  },\n  branchId: chain.BranchID,\n  status: {\n    id: chain.StatusID,\n    code: chain.StatusCode,\n    name: chain.StatusName,\n    color: chain.ColorCode\n  },\n  amounts: {\n    estimated: parseFloat(chain.TotalEstimatedAmount || 0),\n    invoiced: parseFloat(chain.TotalInvoicedAmount || 0),\n    paid: parseFloat(chain.TotalPaidAmount || 0),\n    balance: parseFloat(chain.BalanceAmount || 0)\n  },\n  documentCounts: {\n    quotations: chain.QuotationCount || 0,\n    lpos: chain.LPOCount || 0,\n    deliveryOrders: chain.DOCount || 0,\n    invoices: chain.InvoiceCount || 0,\n    payments: chain.PaymentCount || 0,\n    assets: chain.AssetCount || 0\n  },\n  expectedDocuments: {\n    hasQuotation: chain.HasQuotation,\n    hasLPO: chain.HasLPO,\n    hasDeliveryOrder: chain.HasDeliveryOrder,\n    hasProforma: chain.HasProforma,\n    hasInvoice: chain.HasInvoice\n  },\n  isDirectPurchase: chain.IsDirectPurchase,\n  currentStage: chain.CurrentStage,\n  createdBy: chain.CreatedBy,\n  createdAt: chain.CreatedAt,\n  updatedAt: chain.UpdatedAt,\n  notes: chain.Notes || null\n}));\n\nreturn {\n  json: {\n    chains: formattedChains,\n    totalCount: totalCount,\n    limit: limit,\n    offset: offset,\n    hasMore: offset + limit < totalCount\n  }\n};"
+      },
+      "id": "format-response",
+      "name": "Format Response Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1120, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"data\": {\n    \"chains\": $json.chains,\n    \"pagination\": {\n      \"total\": $json.totalCount,\n      \"limit\": $json.limit,\n      \"offset\": $json.offset,\n      \"hasMore\": $json.hasMore\n    }\n  }\n} }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "GET, POST, PUT, DELETE, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "id": "send-list-response",
+      "name": "Send List Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 600]
+    }
+  ],
+  "connections": {
+    "POST /chain-api/create": {
+      "main": [
+        [
+          {
+            "node": "Generate Chain Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Chain Number": {
+      "main": [
+        [
+          {
+            "node": "Insert Chain Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Chain Record": {
+      "main": [
+        [
+          {
+            "node": "Log Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Activity": {
+      "main": [
+        [
+          {
+            "node": "Create Folder Structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Folder Structure": {
+      "main": [
+        [
+          {
+            "node": "Send Create Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /chain-api/list": {
+      "main": [
+        [
+          {
+            "node": "Build Dynamic SQL Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dynamic SQL Query": {
+      "main": [
+        [
+          {
+            "node": "Get Chains List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Chains List": {
+      "main": [
+        [
+          {
+            "node": "Get Total Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Total Count": {
+      "main": [
+        [
+          {
+            "node": "Format Response Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response Data": {
+      "main": [
+        [
+          {
+            "node": "Send List Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "id": "inv-chain-api",
+  "tags": []
+}

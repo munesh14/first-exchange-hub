@@ -1,0 +1,148 @@
+{
+  "name": "FE Asset - Put To Use API Endpoints",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "asset-api/put-to-use", "options": {} },
+      "id": "asset-ptu",
+      "name": "POST Put To Use",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 100],
+      "webhookId": "asset-ptu-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "asset-api/pending-activation", "options": {} },
+      "id": "asset-pending",
+      "name": "GET Pending Activation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "asset-pending-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nif (!body.assetId) return [{ json: { valid: false, error: 'assetId required' } }];\nif (!body.putToUseDate) return [{ json: { valid: false, error: 'putToUseDate required' } }];\nif (!body.putToUseBy) return [{ json: { valid: false, error: 'putToUseBy (userId) required' } }];\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "asset-ptu-validate",
+      "name": "Validate Put To Use",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "check", "leftValue": "={{ $json.valid }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "asset-ptu-check",
+      "name": "Check Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Validation failed', details: $json.error } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "asset-ptu-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Execute stored procedure to generate asset tag and activate depreciation\nEXEC sp_GenerateAssetTagOnPutToUse \n  @AssetID = {{ $json.assetId }},\n  @PutToUseDate = '{{ $json.putToUseDate }}',\n  @PutToUseByUserID = {{ $json.putToUseBy }};",
+        "options": {}
+      },
+      "id": "asset-ptu-exec",
+      "name": "Execute Put To Use",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Log the action\nINSERT INTO AssetAuditLog (AssetID, Action, ActionAt, ActionBy, Notes)\nVALUES (\n  {{ $('Validate Put To Use').first().json.assetId }},\n  'PUT_TO_USE',\n  GETDATE(),\n  {{ $('Validate Put To Use').first().json.putToUseBy }},\n  'Asset put to use on {{ $('Validate Put To Use').first().json.putToUseDate }}. Tag generated: ' + (SELECT AssetTag FROM Assets WHERE AssetID = {{ $('Validate Put To Use').first().json.assetId }})\n);\n\n-- Return updated asset\nSELECT a.*, d.DepartmentName, b.BranchName, c.CategoryName, l.LocationName, u.FullName AS PutToUseByName\nFROM Assets a\nLEFT JOIN Departments d ON a.DepartmentID = d.DepartmentID\nLEFT JOIN Branches b ON a.BranchID = b.BranchID\nLEFT JOIN ExpenseCategories c ON a.CategoryID = c.CategoryID\nLEFT JOIN Locations l ON a.LocationID = l.LocationID\nLEFT JOIN Users u ON a.PutToUseBy = u.UserID\nWHERE a.AssetID = {{ $('Validate Put To Use').first().json.assetId }};",
+        "options": {}
+      },
+      "id": "asset-ptu-get",
+      "name": "Get Updated Asset",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1140, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Asset put to use, tag generated: ' + $json[0].AssetTag, asset: $json[0] } }}",
+        "options": {}
+      },
+      "id": "asset-ptu-respond",
+      "name": "Respond Put To Use",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nlet where = \"WHERE a.DatePutToUse IS NULL AND a.AssetTag = 'PENDING'\";\nif (query.departmentId) where += ` AND a.DepartmentID = ${query.departmentId}`;\nif (query.branchId) where += ` AND a.BranchID = ${query.branchId}`;\nreturn [{ json: { where, limit: query.limit || 100 } }];"
+      },
+      "id": "asset-pending-build",
+      "name": "Build Pending Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT a.AssetID, a.AssetUUID, a.AssetTag, a.AssetName, a.Description,\n  a.PurchaseDate, a.PurchasePriceOMR, a.SerialNumber,\n  d.DepartmentName, b.BranchName, c.CategoryName,\n  v.VendorName, do.DONumber, lpo.LPONumber, i.InvoiceNumber,\n  a.CreatedFromDocument, a.CreatedAt\nFROM Assets a\nLEFT JOIN Departments d ON a.DepartmentID = d.DepartmentID\nLEFT JOIN Branches b ON a.BranchID = b.BranchID\nLEFT JOIN ExpenseCategories c ON a.CategoryID = c.CategoryID\nLEFT JOIN Vendors v ON a.VendorID = v.VendorID\nLEFT JOIN DeliveryOrders do ON a.DOID = do.DOID\nLEFT JOIN LocalPurchaseOrders lpo ON a.LPOItemID = lpo.LPOID\nLEFT JOIN Invoices i ON a.InvoiceID = i.InvoiceID\n{{ $json.where }}\nORDER BY a.CreatedAt DESC;",
+        "options": {}
+      },
+      "id": "asset-pending-query",
+      "name": "Query Pending",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, pendingAssets: $json, count: $json.length } }}",
+        "options": {}
+      },
+      "id": "asset-pending-respond",
+      "name": "Respond Pending",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 300]
+    }
+  ],
+  "connections": {
+    "POST Put To Use": { "main": [[{ "node": "Validate Put To Use", "type": "main", "index": 0 }]] },
+    "Validate Put To Use": { "main": [[{ "node": "Check Valid", "type": "main", "index": 0 }]] },
+    "Check Valid": { "main": [[{ "node": "Execute Put To Use", "type": "main", "index": 0 }], [{ "node": "Respond Error", "type": "main", "index": 0 }]] },
+    "Execute Put To Use": { "main": [[{ "node": "Get Updated Asset", "type": "main", "index": 0 }]] },
+    "Get Updated Asset": { "main": [[{ "node": "Respond Put To Use", "type": "main", "index": 0 }]] },
+    "GET Pending Activation": { "main": [[{ "node": "Build Pending Query", "type": "main", "index": 0 }]] },
+    "Build Pending Query": { "main": [[{ "node": "Query Pending", "type": "main", "index": 0 }]] },
+    "Query Pending": { "main": [[{ "node": "Respond Pending", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "1",
+  "meta": { "instanceId": "fe-invoice-system" },
+  "tags": []
+}

@@ -57,6 +57,7 @@ import {
   XCircle,
   RotateCcw,
   Download,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -120,7 +121,7 @@ export default function InvoiceDetail() {
     return Number((amount * rate).toFixed(3));
   };
 
-  const { data: invoiceData, isLoading } = useQuery({
+  const { data: invoiceData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['invoice', invoiceUuid],
     queryFn: () => api.getInvoice(invoiceUuid!),
     enabled: !!invoiceUuid,
@@ -434,6 +435,10 @@ export default function InvoiceDetail() {
         ]}
         actions={
           <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Button variant="outline" onClick={() => navigate('/invoices')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back

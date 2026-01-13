@@ -5,10 +5,10 @@ import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Clock, FileText, Eye, Upload } from 'lucide-react';
+import { Clock, FileText, Eye, Upload, RefreshCw } from 'lucide-react';
 
 export default function PendingReview() {
-  const { data: invoices, isLoading } = useQuery({
+  const { data: invoices, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['invoices', 'PENDING_REVIEW'],
     queryFn: () => api.getInvoices({ status: 'PENDING_REVIEW' }),
   });
@@ -20,12 +20,18 @@ export default function PendingReview() {
         description="Invoices awaiting your review and verification"
         breadcrumbs={[{ label: 'Pending Review' }]}
         actions={
-          <Link to="/upload">
-            <Button className="gap-2">
-              <Upload className="w-4 h-4" />
-              Upload Invoice
+          <>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching} className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-          </Link>
+            <Link to="/upload">
+              <Button className="gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Invoice
+              </Button>
+            </Link>
+          </>
         }
       />
 

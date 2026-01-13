@@ -16,21 +16,29 @@ import {
   Upload,
   ArrowRight,
   FileText,
+  RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Dashboard() {
   const { currentUser } = useUser();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats, isFetching: statsFetching } = useQuery({
     queryKey: ['stats'],
     queryFn: api.getStats,
   });
 
-  const { data: invoices, isLoading: invoicesLoading } = useQuery({
+  const { data: invoices, isLoading: invoicesLoading, refetch: refetchInvoices, isFetching: invoicesFetching } = useQuery({
     queryKey: ['invoices', 'recent'],
     queryFn: () => api.getInvoices(),
   });
+
+  const isRefreshing = statsFetching || invoicesFetching;
+
+  const handleRefresh = () => {
+    refetchStats();
+    refetchInvoices();
+  };
 
   const recentInvoices = invoices?.slice(0, 10) || [];
 
@@ -40,12 +48,18 @@ export default function Dashboard() {
         title={`Welcome back, ${currentUser?.FullName?.split(' ')[0]}!`}
         description="Here's what's happening with your invoices today."
         actions={
-          <Link to="/upload">
-            <Button className="gap-2">
-              <Upload className="w-4 h-4" />
-              Upload Invoice
+          <>
+            <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing} className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-          </Link>
+            <Link to="/upload">
+              <Button className="gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Invoice
+              </Button>
+            </Link>
+          </>
         }
       />
 
@@ -87,7 +101,7 @@ export default function Dashboard() {
           iconColor="text-orange-600"
         />
         <StatCard
-          title="Total Approved (OMR)"
+          title="Total Approved"
           value={
             statsLoading
               ? '...'

@@ -1,0 +1,354 @@
+{
+  "name": "FE Document Chain - API Endpoints v2",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "GET", "path": "chain-api/get", "options": {} },
+      "id": "chain-get",
+      "name": "GET Chain by UUID",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 100],
+      "webhookId": "chain-get-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const params = $input.first().json.query || {};\nconst uuid = params.uuid || null;\n\nif (!uuid) {\n  return [{ json: { valid: false, error: 'uuid parameter is required' } }];\n}\n\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(uuid)) {\n  return [{ json: { valid: false, error: 'Invalid UUID format' } }];\n}\n\nreturn [{ json: { valid: true, uuid: uuid } }];"
+      },
+      "id": "validate-get-input",
+      "name": "Validate UUID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "valid-get-check", "leftValue": "={{ $json.valid }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-get-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  c.ChainID,\n  CONVERT(VARCHAR(36), c.ChainUUID) AS ChainUUID,\n  c.ChainNumber,\n  c.Title,\n  c.Description,\n  c.VendorID,\n  c.VendorName,\n  c.DepartmentID,\n  d.DepartmentName,\n  c.BranchID,\n  b.BranchName,\n  c.StatusID,\n  cs.StatusCode,\n  cs.StatusName,\n  cs.ColorCode,\n  c.TotalEstimatedAmount,\n  c.TotalInvoicedAmount,\n  c.TotalPaidAmount,\n  c.BalanceAmount,\n  c.QuotationCount,\n  c.LPOCount,\n  c.DOCount,\n  c.InvoiceCount,\n  c.PaymentCount,\n  c.AssetCount,\n  c.HasQuotation,\n  c.HasLPO,\n  c.HasDeliveryOrder,\n  c.HasProforma,\n  c.HasInvoice,\n  c.IsDirectPurchase,\n  c.CurrentStage,\n  c.CreatedBy,\n  u.FullName AS CreatedByName,\n  c.CreatedAt,\n  c.UpdatedAt,\n  c.Notes\nFROM ProcurementChains c\nLEFT JOIN ChainStatus cs ON c.StatusID = cs.StatusID\nLEFT JOIN Departments d ON c.DepartmentID = d.DepartmentID\nLEFT JOIN Branches b ON c.BranchID = b.BranchID\nLEFT JOIN Users u ON c.CreatedBy = u.UserID\nWHERE c.ChainUUID = '{{ $json.uuid }}';",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-chain-details",
+      "name": "Get Chain Details",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "id": "chain-exists-check", "leftValue": "={{ $json.ChainID }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-chain-exists",
+      "name": "Chain Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1140, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  QuotationID,\n  CONVERT(VARCHAR(36), QuotationUUID) AS QuotationUUID,\n  QuotationNumber,\n  VendorName,\n  QuotationDate,\n  ValidUntil,\n  TotalAmount,\n  CurrencyCode,\n  StatusID,\n  FilePath,\n  CreatedAt\nFROM Quotations \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY CreatedAt;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-quotations",
+      "name": "Get Quotations",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1360, -100],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  l.LPOID,\n  CONVERT(VARCHAR(36), l.LPOUUID) AS LPOUUID,\n  l.LPONumber,\n  l.VendorName,\n  l.LPODate,\n  l.DeliveryDate,\n  l.TotalAmount,\n  l.CurrencyCode,\n  l.ApprovalStatus,\n  CASE \n    WHEN l.ApprovalStatus = 'Approved' THEN 'APPROVED'\n    WHEN l.ApprovalStatus = 'Rejected' THEN 'REJECTED'\n    ELSE 'PENDING' \n  END AS StatusCode,\n  l.ApprovedBy,\n  l.ApprovedAt,\n  l.FilePath,\n  l.ChainSequence,\n  l.CreatedAt\nFROM LocalPurchaseOrders l \nWHERE l.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY l.ChainSequence;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-lpos",
+      "name": "Get LPOs",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1580, -100],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  DeliveryOrderID,\n  CONVERT(VARCHAR(36), DeliveryOrderUUID) AS DeliveryOrderUUID,\n  DONumber,\n  VendorName,\n  DeliveryDate,\n  ReceivedBy,\n  ReceivedAt,\n  StatusID,\n  FilePath,\n  Notes,\n  CreatedAt\nFROM DeliveryOrders \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY CreatedAt;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-delivery-orders",
+      "name": "Get Delivery Orders",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1800, -100],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  i.InvoiceID,\n  CONVERT(VARCHAR(36), i.InvoiceUUID) AS InvoiceUUID,\n  i.InvoiceNumber,\n  i.VendorNameExtracted AS VendorName,\n  i.InvoiceDate,\n  i.DueDate,\n  i.TotalAmount,\n  i.CurrencyCode,\n  i.StatusID,\n  s.StatusCode,\n  s.StatusName,\n  i.FilePath,\n  i.CreatedAt\nFROM Invoices i\nLEFT JOIN InvoiceStatus s ON i.StatusID = s.StatusID\nWHERE i.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY i.CreatedAt;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-invoices",
+      "name": "Get Invoices",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2020, -100],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  PaymentID,\n  CONVERT(VARCHAR(36), PaymentUUID) AS PaymentUUID,\n  PaymentReference,\n  PaymentDate,\n  Amount,\n  CurrencyCode,\n  PaymentMethod,\n  BankName,\n  ChequeNumber,\n  ChequeDate,\n  StatusID,\n  Notes,\n  CreatedAt\nFROM Payments \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY PaymentDate;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-payments",
+      "name": "Get Payments",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2240, -100],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  a.AssetID,\n  CONVERT(VARCHAR(36), a.AssetUUID) AS AssetUUID,\n  a.AssetTag,\n  a.AssetName,\n  a.AssetCategoryID,\n  ac.CategoryName,\n  ac.DepreciationRate,\n  a.SerialNumber,\n  a.PurchasePriceOMR,\n  a.CurrentBookValue,\n  a.DepreciationMethod,\n  a.UsefulLifeYears,\n  a.AssignedTo,\n  a.Location,\n  a.StatusID,\n  a.CreatedAt\nFROM Assets a\nLEFT JOIN AssetCategories ac ON a.AssetCategoryID = ac.CategoryID\nWHERE a.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY a.CreatedAt;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-assets",
+      "name": "Get Assets",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2460, -100],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  cal.LogID,\n  cal.ActivityType,\n  cal.ActivityDescription,\n  cal.OldStatusID,\n  old_s.StatusName AS OldStatusName,\n  cal.NewStatusID,\n  new_s.StatusName AS NewStatusName,\n  cal.PerformedBy,\n  u.FullName AS PerformedByName,\n  cal.PerformedAt,\n  cal.Notes\nFROM ChainActivityLog cal\nLEFT JOIN Users u ON cal.PerformedBy = u.UserID\nLEFT JOIN ChainStatus old_s ON cal.OldStatusID = old_s.StatusID\nLEFT JOIN ChainStatus new_s ON cal.NewStatusID = new_s.StatusID\nWHERE cal.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY cal.PerformedAt DESC;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "get-activity-log",
+      "name": "Get Activity Log",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2680, -100],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get chain details\nconst chainData = $('Get Chain Details').first().json;\n\n// Get all related documents\nconst quotationsData = $('Get Quotations').all();\nconst lposData = $('Get LPOs').all();\nconst deliveryOrdersData = $('Get Delivery Orders').all();\nconst invoicesData = $('Get Invoices').all();\nconst paymentsData = $('Get Payments').all();\nconst assetsData = $('Get Assets').all();\nconst activityLogData = $('Get Activity Log').all();\n\n// Format chain\nconst chain = {\n  chainId: chainData.ChainID,\n  chainUuid: chainData.ChainUUID,\n  chainNumber: chainData.ChainNumber,\n  title: chainData.Title,\n  description: chainData.Description || null,\n  vendor: {\n    id: chainData.VendorID,\n    name: chainData.VendorName\n  },\n  department: {\n    id: chainData.DepartmentID,\n    name: chainData.DepartmentName\n  },\n  branch: {\n    id: chainData.BranchID,\n    name: chainData.BranchName\n  },\n  status: {\n    id: chainData.StatusID,\n    code: chainData.StatusCode,\n    name: chainData.StatusName,\n    color: chainData.ColorCode\n  },\n  amounts: {\n    estimated: parseFloat(chainData.TotalEstimatedAmount || 0),\n    invoiced: parseFloat(chainData.TotalInvoicedAmount || 0),\n    paid: parseFloat(chainData.TotalPaidAmount || 0),\n    balance: parseFloat(chainData.BalanceAmount || 0)\n  },\n  documentCounts: {\n    quotations: chainData.QuotationCount || 0,\n    lpos: chainData.LPOCount || 0,\n    deliveryOrders: chainData.DOCount || 0,\n    invoices: chainData.InvoiceCount || 0,\n    payments: chainData.PaymentCount || 0,\n    assets: chainData.AssetCount || 0\n  },\n  expectedDocuments: {\n    hasQuotation: chainData.HasQuotation,\n    hasLPO: chainData.HasLPO,\n    hasDeliveryOrder: chainData.HasDeliveryOrder,\n    hasProforma: chainData.HasProforma,\n    hasInvoice: chainData.HasInvoice\n  },\n  isDirectPurchase: chainData.IsDirectPurchase,\n  currentStage: chainData.CurrentStage,\n  createdBy: {\n    id: chainData.CreatedBy,\n    name: chainData.CreatedByName\n  },\n  createdAt: chainData.CreatedAt,\n  updatedAt: chainData.UpdatedAt,\n  notes: chainData.Notes || null\n};\n\n// Format quotations\nconst quotations = quotationsData\n  .filter(item => item.json.QuotationID)\n  .map(item => ({\n    quotationId: item.json.QuotationID,\n    quotationUuid: item.json.QuotationUUID,\n    quotationNumber: item.json.QuotationNumber,\n    vendorName: item.json.VendorName,\n    quotationDate: item.json.QuotationDate,\n    validUntil: item.json.ValidUntil,\n    totalAmount: parseFloat(item.json.TotalAmount || 0),\n    currencyCode: item.json.CurrencyCode,\n    statusId: item.json.StatusID,\n    filePath: item.json.FilePath,\n    createdAt: item.json.CreatedAt\n  }));\n\n// Format LPOs\nconst lpos = lposData\n  .filter(item => item.json.LPOID)\n  .map(item => ({\n    lpoId: item.json.LPOID,\n    lpoUuid: item.json.LPOUUID,\n    lpoNumber: item.json.LPONumber,\n    vendorName: item.json.VendorName,\n    lpoDate: item.json.LPODate,\n    deliveryDate: item.json.DeliveryDate,\n    totalAmount: parseFloat(item.json.TotalAmount || 0),\n    currencyCode: item.json.CurrencyCode,\n    approvalStatus: item.json.ApprovalStatus,\n    statusCode: item.json.StatusCode,\n    approvedBy: item.json.ApprovedBy,\n    approvedAt: item.json.ApprovedAt,\n    filePath: item.json.FilePath,\n    chainSequence: item.json.ChainSequence,\n    createdAt: item.json.CreatedAt\n  }));\n\n// Format Delivery Orders\nconst deliveryOrders = deliveryOrdersData\n  .filter(item => item.json.DeliveryOrderID)\n  .map(item => ({\n    deliveryOrderId: item.json.DeliveryOrderID,\n    deliveryOrderUuid: item.json.DeliveryOrderUUID,\n    doNumber: item.json.DONumber,\n    vendorName: item.json.VendorName,\n    deliveryDate: item.json.DeliveryDate,\n    receivedBy: item.json.ReceivedBy,\n    receivedAt: item.json.ReceivedAt,\n    statusId: item.json.StatusID,\n    filePath: item.json.FilePath,\n    notes: item.json.Notes,\n    createdAt: item.json.CreatedAt\n  }));\n\n// Format Invoices\nconst invoices = invoicesData\n  .filter(item => item.json.InvoiceID)\n  .map(item => ({\n    invoiceId: item.json.InvoiceID,\n    invoiceUuid: item.json.InvoiceUUID,\n    invoiceNumber: item.json.InvoiceNumber,\n    vendorName: item.json.VendorName,\n    invoiceDate: item.json.InvoiceDate,\n    dueDate: item.json.DueDate,\n    totalAmount: parseFloat(item.json.TotalAmount || 0),\n    currencyCode: item.json.CurrencyCode,\n    status: {\n      id: item.json.StatusID,\n      code: item.json.StatusCode,\n      name: item.json.StatusName\n    },\n    filePath: item.json.FilePath,\n    createdAt: item.json.CreatedAt\n  }));\n\n// Format Payments\nconst payments = paymentsData\n  .filter(item => item.json.PaymentID)\n  .map(item => ({\n    paymentId: item.json.PaymentID,\n    paymentUuid: item.json.PaymentUUID,\n    paymentReference: item.json.PaymentReference,\n    paymentDate: item.json.PaymentDate,\n    amount: parseFloat(item.json.Amount || 0),\n    currencyCode: item.json.CurrencyCode,\n    paymentMethod: item.json.PaymentMethod,\n    bankName: item.json.BankName,\n    chequeNumber: item.json.ChequeNumber,\n    chequeDate: item.json.ChequeDate,\n    statusId: item.json.StatusID,\n    notes: item.json.Notes,\n    createdAt: item.json.CreatedAt\n  }));\n\n// Format Assets\nconst assets = assetsData\n  .filter(item => item.json.AssetID)\n  .map(item => ({\n    assetId: item.json.AssetID,\n    assetUuid: item.json.AssetUUID,\n    assetTag: item.json.AssetTag,\n    assetName: item.json.AssetName,\n    category: {\n      id: item.json.AssetCategoryID,\n      name: item.json.CategoryName,\n      depreciationRate: parseFloat(item.json.DepreciationRate || 0)\n    },\n    serialNumber: item.json.SerialNumber,\n    purchasePriceOMR: parseFloat(item.json.PurchasePriceOMR || 0),\n    currentBookValue: parseFloat(item.json.CurrentBookValue || 0),\n    depreciationMethod: item.json.DepreciationMethod,\n    usefulLifeYears: item.json.UsefulLifeYears,\n    assignedTo: item.json.AssignedTo,\n    location: item.json.Location,\n    statusId: item.json.StatusID,\n    createdAt: item.json.CreatedAt\n  }));\n\n// Format Activity Log\nconst activityLog = activityLogData\n  .filter(item => item.json.LogID)\n  .map(item => ({\n    logId: item.json.LogID,\n    activityType: item.json.ActivityType,\n    activityDescription: item.json.ActivityDescription,\n    oldStatus: item.json.OldStatusID ? {\n      id: item.json.OldStatusID,\n      name: item.json.OldStatusName\n    } : null,\n    newStatus: item.json.NewStatusID ? {\n      id: item.json.NewStatusID,\n      name: item.json.NewStatusName\n    } : null,\n    performedBy: {\n      id: item.json.PerformedBy,\n      name: item.json.PerformedByName\n    },\n    performedAt: item.json.PerformedAt,\n    notes: item.json.Notes\n  }));\n\nreturn [{\n  json: {\n    success: true,\n    data: {\n      chain: chain,\n      documents: {\n        quotations: quotations,\n        lpos: lpos,\n        deliveryOrders: deliveryOrders,\n        invoices: invoices,\n        payments: payments\n      },\n      assets: assets,\n      activityLog: activityLog\n    }\n  }\n}];"
+      },
+      "id": "format-chain-response",
+      "name": "Format Chain Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2900, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" },
+              { "name": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+              { "name": "Access-Control-Allow-Headers", "value": "Content-Type" }
+            ]
+          }
+        }
+      },
+      "id": "send-chain-response",
+      "name": "Send Chain Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3120, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error || 'Invalid request' } }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }]
+          }
+        }
+      },
+      "id": "send-get-error",
+      "name": "Send Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Chain not found' } }}",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }]
+          }
+        }
+      },
+      "id": "send-not-found",
+      "name": "Send Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 100]
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "chain-api/by-document", "options": {} },
+      "id": "chain-by-doc",
+      "name": "GET Chain by Document",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 500],
+      "webhookId": "chain-by-doc-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nif (!query.type) return [{ json: { valid: false, error: 'type required (QUOTATION, LPO, INVOICE, DO, PROFORMA)' } }];\nif (!query.id) return [{ json: { valid: false, error: 'id required' } }];\nconst typeMap = { 'QUOTATION': 'QuotationID', 'LPO': 'LPOID', 'INVOICE': 'InvoiceID', 'DO': 'DeliveryOrderID', 'PROFORMA': 'ProformaID' };\nconst tableMap = { 'QUOTATION': 'Quotations', 'LPO': 'LocalPurchaseOrders', 'INVOICE': 'Invoices', 'DO': 'DeliveryOrders', 'PROFORMA': 'ProformaInvoices' };\nconst column = typeMap[query.type.toUpperCase()];\nconst table = tableMap[query.type.toUpperCase()];\nif (!column) return [{ json: { valid: false, error: 'Invalid type' } }];\nreturn [{ json: { valid: true, column, table, id: query.id, type: query.type.toUpperCase() } }];"
+      },
+      "id": "chain-by-doc-validate",
+      "name": "Validate By Doc",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DECLARE @ChainID INT;\nSELECT @ChainID = ChainID FROM {{ $json.table }} WHERE {{ $json.column }} = {{ $json.id }};\n\nIF @ChainID IS NOT NULL\nBEGIN\n  SELECT CONVERT(VARCHAR(36), ChainUUID) AS ChainUUID, ChainNumber, Title\n  FROM ProcurementChains WHERE ChainID = @ChainID;\nEND\nELSE\nBEGIN\n  SELECT NULL AS ChainUUID, NULL AS ChainNumber, NULL AS Title;\nEND",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "chain-by-doc-query",
+      "name": "Query By Document",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 500],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: $json.ChainUUID ? true : false, data: $json.ChainUUID ? { chainUuid: $json.ChainUUID, chainNumber: $json.ChainNumber, title: $json.Title } : null, error: $json.ChainUUID ? null : 'No chain found for this document' } }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }]
+          }
+        }
+      },
+      "id": "chain-by-doc-respond",
+      "name": "Respond By Doc",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 500]
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "chain-api/timeline", "options": {} },
+      "id": "chain-timeline",
+      "name": "GET Chain Timeline",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 800],
+      "webhookId": "chain-timeline-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nif (!query.uuid) return [{ json: { valid: false, error: 'uuid (chainUUID) required' } }];\nreturn [{ json: { valid: true, uuid: query.uuid } }];"
+      },
+      "id": "chain-timeline-validate",
+      "name": "Validate Timeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 800]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DECLARE @ChainID INT;\nSELECT @ChainID = ChainID FROM ProcurementChains WHERE ChainUUID = '{{ $json.uuid }}';\n\nSELECT * FROM (\n  -- Chain created\n  SELECT 'CHAIN_CREATED' AS EventType, ChainNumber AS Reference, CreatedAt AS EventDate, \n    (SELECT FullName FROM Users WHERE UserID = CreatedBy) AS EventBy, \n    'Chain created: ' + Title AS Description, TotalEstimatedAmount AS Amount\n  FROM ProcurementChains WHERE ChainID = @ChainID\n  \n  UNION ALL\n  \n  -- Quotations\n  SELECT 'QUOTATION_ADDED' AS EventType, QuotationNumber, CreatedAt,\n    (SELECT FullName FROM Users WHERE UserID = CreatedBy) AS EventBy,\n    'Quotation added from ' + VendorName, TotalAmount\n  FROM Quotations WHERE ChainID = @ChainID\n  \n  UNION ALL\n  \n  -- LPOs\n  SELECT 'LPO_CREATED' AS EventType, LPONumber, CreatedAt,\n    (SELECT FullName FROM Users WHERE UserID = CreatedBy) AS EventBy,\n    'LPO created', TotalAmount\n  FROM LocalPurchaseOrders WHERE ChainID = @ChainID\n  \n  UNION ALL\n  \n  SELECT 'LPO_APPROVED' AS EventType, LPONumber, ApprovedAt,\n    (SELECT FullName FROM Users WHERE UserID = ApprovedBy) AS EventBy,\n    'LPO approved', TotalAmount\n  FROM LocalPurchaseOrders WHERE ChainID = @ChainID AND ApprovedAt IS NOT NULL\n  \n  UNION ALL\n  \n  -- Delivery Orders\n  SELECT 'DO_RECEIVED' AS EventType, DONumber, ReceivedAt,\n    ReceivedBy AS EventBy, 'Goods received', NULL\n  FROM DeliveryOrders WHERE ChainID = @ChainID AND ReceivedAt IS NOT NULL\n  \n  UNION ALL\n  \n  -- Invoices\n  SELECT 'INVOICE_ADDED' AS EventType, InvoiceNumber, CreatedAt,\n    (SELECT FullName FROM Users WHERE UserID = CreatedBy) AS EventBy,\n    'Invoice uploaded', TotalAmount\n  FROM Invoices WHERE ChainID = @ChainID\n  \n  UNION ALL\n  \n  -- Payments\n  SELECT 'PAYMENT_RECORDED' AS EventType, PaymentReference, PaymentDate,\n    (SELECT FullName FROM Users WHERE UserID = CreatedBy) AS EventBy,\n    PaymentMethod + ' payment', Amount\n  FROM Payments WHERE ChainID = @ChainID\n  \n  UNION ALL\n  \n  -- Activity Log\n  SELECT ActivityType AS EventType, NULL AS Reference, PerformedAt AS EventDate,\n    (SELECT FullName FROM Users WHERE UserID = PerformedBy) AS EventBy,\n    ActivityDescription AS Description, NULL AS Amount\n  FROM ChainActivityLog WHERE ChainID = @ChainID\n) AS Timeline\nWHERE EventDate IS NOT NULL\nORDER BY EventDate;",
+        "options": { "alwaysOutputData": true }
+      },
+      "id": "chain-timeline-query",
+      "name": "Query Timeline",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 800],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, data: { timeline: $json } } }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }]
+          }
+        }
+      },
+      "id": "chain-timeline-respond",
+      "name": "Respond Timeline",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 800]
+    }
+  ],
+  "connections": {
+    "GET Chain by UUID": { "main": [[{ "node": "Validate UUID", "type": "main", "index": 0 }]] },
+    "Validate UUID": { "main": [[{ "node": "Is Valid?", "type": "main", "index": 0 }]] },
+    "Is Valid?": {
+      "main": [
+        [{ "node": "Get Chain Details", "type": "main", "index": 0 }],
+        [{ "node": "Send Validation Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Chain Details": { "main": [[{ "node": "Chain Exists?", "type": "main", "index": 0 }]] },
+    "Chain Exists?": {
+      "main": [
+        [{ "node": "Get Quotations", "type": "main", "index": 0 }],
+        [{ "node": "Send Not Found", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Quotations": { "main": [[{ "node": "Get LPOs", "type": "main", "index": 0 }]] },
+    "Get LPOs": { "main": [[{ "node": "Get Delivery Orders", "type": "main", "index": 0 }]] },
+    "Get Delivery Orders": { "main": [[{ "node": "Get Invoices", "type": "main", "index": 0 }]] },
+    "Get Invoices": { "main": [[{ "node": "Get Payments", "type": "main", "index": 0 }]] },
+    "Get Payments": { "main": [[{ "node": "Get Assets", "type": "main", "index": 0 }]] },
+    "Get Assets": { "main": [[{ "node": "Get Activity Log", "type": "main", "index": 0 }]] },
+    "Get Activity Log": { "main": [[{ "node": "Format Chain Response", "type": "main", "index": 0 }]] },
+    "Format Chain Response": { "main": [[{ "node": "Send Chain Response", "type": "main", "index": 0 }]] },
+    "GET Chain by Document": { "main": [[{ "node": "Validate By Doc", "type": "main", "index": 0 }]] },
+    "Validate By Doc": { "main": [[{ "node": "Query By Document", "type": "main", "index": 0 }]] },
+    "Query By Document": { "main": [[{ "node": "Respond By Doc", "type": "main", "index": 0 }]] },
+    "GET Chain Timeline": { "main": [[{ "node": "Validate Timeline", "type": "main", "index": 0 }]] },
+    "Validate Timeline": { "main": [[{ "node": "Query Timeline", "type": "main", "index": 0 }]] },
+    "Query Timeline": { "main": [[{ "node": "Respond Timeline", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "2",
+  "meta": { "instanceId": "fe-invoice-system" },
+  "tags": []
+}

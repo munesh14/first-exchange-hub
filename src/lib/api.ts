@@ -58,8 +58,9 @@ export interface User {
   UserID: number;
   FullName: string;
   Email: string;
-  DepartmentID: number;
-  DepartmentName: string;
+  DepartmentID: number | null;
+  DepartmentName: string | null;
+  RoleCode?: string | null;
 }
 
 // Department Types

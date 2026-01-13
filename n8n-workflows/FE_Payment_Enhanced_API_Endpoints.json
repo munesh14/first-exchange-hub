@@ -1,0 +1,375 @@
+{
+  "name": "FE Payment - Enhanced API Endpoints",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "payment-api/create", "options": {} },
+      "id": "pay-create",
+      "name": "POST Create Payment",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 100],
+      "webhookId": "pay-create-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "payment-api/list", "options": {} },
+      "id": "pay-list",
+      "name": "GET Payment List",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "pay-list-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "payment-api/get", "options": {} },
+      "id": "pay-get",
+      "name": "GET Payment Detail",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 450],
+      "webhookId": "pay-get-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "payment-api/by-lpo", "options": {} },
+      "id": "pay-by-lpo",
+      "name": "GET Payments by LPO",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 600],
+      "webhookId": "pay-by-lpo-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "payment-api/by-invoice", "options": {} },
+      "id": "pay-by-inv",
+      "name": "GET Payments by Invoice",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 750],
+      "webhookId": "pay-by-inv-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "payment-api/pdc/update-status", "options": {} },
+      "id": "pay-pdc-update",
+      "name": "POST Update PDC Status",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 900],
+      "webhookId": "pay-pdc-update-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "payment-api/pdc/pending", "options": {} },
+      "id": "pay-pdc-pending",
+      "name": "GET Pending PDCs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1050],
+      "webhookId": "pay-pdc-pending-webhook"
+    },
+    {
+      "parameters": { "httpMethod": "GET", "path": "payment-api/bank-accounts", "options": {} },
+      "id": "pay-bank-accts",
+      "name": "GET Bank Accounts",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1200],
+      "webhookId": "pay-bank-accts-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst errors = [];\nif (!body.amount || body.amount <= 0) errors.push('amount required and must be positive');\nif (!body.paymentDate) errors.push('paymentDate required');\nif (!body.paymentModeId) errors.push('paymentModeId required');\nif (!body.recordedBy) errors.push('recordedBy required');\nif (!body.invoiceId && !body.lpoId) errors.push('Either invoiceId or lpoId required');\nif (body.paymentModeId === 2 && !body.chequeNumber) errors.push('chequeNumber required for PDC');\nif (body.paymentModeId === 2 && !body.chequeDate) errors.push('chequeDate required for PDC');\nif (errors.length > 0) return [{ json: { valid: false, errors } }];\nreturn [{ json: { valid: true, ...body, paymentCategory: body.paymentCategory || 'FULL_PAYMENT', pdcStatus: body.paymentModeId === 2 ? 'PENDING' : null } }];"
+      },
+      "id": "pay-create-validate",
+      "name": "Validate Payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "check", "leftValue": "={{ $json.valid }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "pay-create-check",
+      "name": "Check Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Validation failed', details: $json.errors } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "pay-create-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO Payments (\n  InvoiceID, LPOID, PaymentDate, Amount, CurrencyCode, PaymentModeID,\n  ReferenceNumber, BankName, PaymentCategory, BankAccountID,\n  ChequeNumber, ChequeDate, PDCStatus, CardLast4, TransactionID,\n  Status, Notes, RecordedBy, RecordedAt\n)\nOUTPUT INSERTED.PaymentID, INSERTED.PaymentUUID\nVALUES (\n  {{ $json.invoiceId || 'NULL' }},\n  {{ $json.lpoId || 'NULL' }},\n  '{{ $json.paymentDate }}',\n  {{ $json.amount }},\n  '{{ $json.currencyCode || 'OMR' }}',\n  {{ $json.paymentModeId }},\n  '{{ $json.referenceNumber || '' }}',\n  '{{ $json.bankName || '' }}',\n  '{{ $json.paymentCategory }}',\n  {{ $json.bankAccountId || 'NULL' }},\n  {{ $json.chequeNumber ? \"'\" + $json.chequeNumber + \"'\" : 'NULL' }},\n  {{ $json.chequeDate ? \"'\" + $json.chequeDate + \"'\" : 'NULL' }},\n  {{ $json.pdcStatus ? \"'\" + $json.pdcStatus + \"'\" : 'NULL' }},\n  {{ $json.cardLast4 ? \"'\" + $json.cardLast4 + \"'\" : 'NULL' }},\n  {{ $json.transactionId ? \"'\" + $json.transactionId + \"'\" : 'NULL' }},\n  'COMPLETED',\n  '{{ $json.notes || '' }}',\n  {{ $json.recordedBy }},\n  GETDATE()\n);",
+        "options": {}
+      },
+      "id": "pay-create-insert",
+      "name": "Insert Payment",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Update payment totals\nDECLARE @InvID INT = {{ $('Validate Payment').first().json.invoiceId || 'NULL' }};\nDECLARE @LPOID INT = {{ $('Validate Payment').first().json.lpoId || 'NULL' }};\n\nIF @InvID IS NOT NULL EXEC sp_UpdatePaymentTotals @InvoiceID = @InvID;\nIF @LPOID IS NOT NULL EXEC sp_UpdatePaymentTotals @LPOID = @LPOID;\n\nSELECT p.*, m.ModeName, u.FullName AS RecordedByName, ba.DisplayName AS BankAccountName\nFROM Payments p\nLEFT JOIN PaymentModes m ON p.PaymentModeID = m.ModeID\nLEFT JOIN Users u ON p.RecordedBy = u.UserID\nLEFT JOIN BankAccounts ba ON p.BankAccountID = ba.AccountID\nWHERE p.PaymentID = {{ $json[0].PaymentID }};",
+        "options": {}
+      },
+      "id": "pay-create-update",
+      "name": "Update Totals",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1140, 0],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Payment recorded', payment: $json[0] } }}",
+        "options": {}
+      },
+      "id": "pay-create-respond",
+      "name": "Respond Create",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nlet where = 'WHERE 1=1';\nif (query.status) where += ` AND p.Status = '${query.status}'`;\nif (query.paymentCategory) where += ` AND p.PaymentCategory = '${query.paymentCategory}'`;\nif (query.pdcStatus) where += ` AND p.PDCStatus = '${query.pdcStatus}'`;\nif (query.fromDate) where += ` AND p.PaymentDate >= '${query.fromDate}'`;\nif (query.toDate) where += ` AND p.PaymentDate <= '${query.toDate}'`;\nreturn [{ json: { where, limit: query.limit || 50, offset: query.offset || 0 } }];"
+      },
+      "id": "pay-list-build",
+      "name": "Build List Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.PaymentID, p.PaymentUUID, p.PaymentDate, p.Amount, p.CurrencyCode, p.Status, p.PaymentCategory, p.PDCStatus, p.ChequeNumber, p.ChequeDate, m.ModeName, u.FullName AS RecordedByName, i.InvoiceNumber, lpo.LPONumber, ba.DisplayName AS BankAccountName FROM Payments p LEFT JOIN PaymentModes m ON p.PaymentModeID = m.ModeID LEFT JOIN Users u ON p.RecordedBy = u.UserID LEFT JOIN Invoices i ON p.InvoiceID = i.InvoiceID LEFT JOIN LocalPurchaseOrders lpo ON p.LPOID = lpo.LPOID LEFT JOIN BankAccounts ba ON p.BankAccountID = ba.AccountID {{ $json.where }} ORDER BY p.PaymentDate DESC OFFSET {{ $json.offset }} ROWS FETCH NEXT {{ $json.limit }} ROWS ONLY;",
+        "options": {}
+      },
+      "id": "pay-list-query",
+      "name": "Query List",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, payments: $json } }}",
+        "options": {}
+      },
+      "id": "pay-list-respond",
+      "name": "Respond List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.*, m.ModeName, u.FullName AS RecordedByName, i.InvoiceNumber, lpo.LPONumber, ba.DisplayName AS BankAccountName FROM Payments p LEFT JOIN PaymentModes m ON p.PaymentModeID = m.ModeID LEFT JOIN Users u ON p.RecordedBy = u.UserID LEFT JOIN Invoices i ON p.InvoiceID = i.InvoiceID LEFT JOIN LocalPurchaseOrders lpo ON p.LPOID = lpo.LPOID LEFT JOIN BankAccounts ba ON p.BankAccountID = ba.AccountID WHERE p.PaymentUUID = '{{ $input.first().json.query.uuid }}';",
+        "options": {}
+      },
+      "id": "pay-get-query",
+      "name": "Get Payment",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [480, 450],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, payment: $json[0] || null } }}",
+        "options": {}
+      },
+      "id": "pay-get-respond",
+      "name": "Respond Detail",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 450]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.*, m.ModeName, u.FullName AS RecordedByName, ba.DisplayName AS BankAccountName FROM Payments p LEFT JOIN PaymentModes m ON p.PaymentModeID = m.ModeID LEFT JOIN Users u ON p.RecordedBy = u.UserID LEFT JOIN BankAccounts ba ON p.BankAccountID = ba.AccountID WHERE p.LPOID = {{ $input.first().json.query.lpoid || 0 }} ORDER BY p.PaymentDate;",
+        "options": {}
+      },
+      "id": "pay-by-lpo-query",
+      "name": "Query by LPO",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [480, 600],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, payments: $json } }}",
+        "options": {}
+      },
+      "id": "pay-by-lpo-respond",
+      "name": "Respond by LPO",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 600]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.*, m.ModeName, u.FullName AS RecordedByName, ba.DisplayName AS BankAccountName FROM Payments p LEFT JOIN PaymentModes m ON p.PaymentModeID = m.ModeID LEFT JOIN Users u ON p.RecordedBy = u.UserID LEFT JOIN BankAccounts ba ON p.BankAccountID = ba.AccountID WHERE p.InvoiceID = {{ $input.first().json.query.invoiceid || 0 }} ORDER BY p.PaymentDate;",
+        "options": {}
+      },
+      "id": "pay-by-inv-query",
+      "name": "Query by Invoice",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [480, 750],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, payments: $json } }}",
+        "options": {}
+      },
+      "id": "pay-by-inv-respond",
+      "name": "Respond by Invoice",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 750]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nif (!body.paymentUuid) return [{ json: { valid: false, error: 'paymentUuid required' } }];\nif (!body.pdcStatus) return [{ json: { valid: false, error: 'pdcStatus required (PENDING, DEPOSITED, CLEARED, BOUNCED, CANCELLED)' } }];\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "pay-pdc-validate",
+      "name": "Validate PDC Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 900]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE Payments SET\n  PDCStatus = '{{ $json.pdcStatus }}',\n  PDCDepositDate = {{ $json.pdcStatus === 'DEPOSITED' ? 'GETDATE()' : 'PDCDepositDate' }},\n  PDCClearDate = {{ $json.pdcStatus === 'CLEARED' ? 'GETDATE()' : 'PDCClearDate' }},\n  Status = CASE WHEN '{{ $json.pdcStatus }}' = 'CLEARED' THEN 'COMPLETED' WHEN '{{ $json.pdcStatus }}' = 'BOUNCED' THEN 'FAILED' ELSE Status END\nWHERE PaymentUUID = '{{ $json.paymentUuid }}';\n\n-- Update related invoice/LPO totals if cleared or bounced\nDECLARE @InvID INT, @LPOID INT;\nSELECT @InvID = InvoiceID, @LPOID = LPOID FROM Payments WHERE PaymentUUID = '{{ $json.paymentUuid }}';\nIF @InvID IS NOT NULL EXEC sp_UpdatePaymentTotals @InvoiceID = @InvID;\nIF @LPOID IS NOT NULL EXEC sp_UpdatePaymentTotals @LPOID = @LPOID;\n\nSELECT * FROM Payments WHERE PaymentUUID = '{{ $json.paymentUuid }}';",
+        "options": {}
+      },
+      "id": "pay-pdc-exec",
+      "name": "Update PDC Status",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 900],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'PDC status updated', payment: $json[0] } }}",
+        "options": {}
+      },
+      "id": "pay-pdc-respond",
+      "name": "Respond PDC Update",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 900]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT p.*, m.ModeName, i.InvoiceNumber, lpo.LPONumber, v.VendorName,\n  DATEDIFF(day, GETDATE(), p.ChequeDate) AS DaysUntilDue\nFROM Payments p\nLEFT JOIN PaymentModes m ON p.PaymentModeID = m.ModeID\nLEFT JOIN Invoices i ON p.InvoiceID = i.InvoiceID\nLEFT JOIN LocalPurchaseOrders lpo ON p.LPOID = lpo.LPOID\nLEFT JOIN Vendors v ON COALESCE(i.VendorID, lpo.VendorID) = v.VendorID\nWHERE p.PaymentModeID = 2 AND p.PDCStatus IN ('PENDING', 'DEPOSITED')\nORDER BY p.ChequeDate;",
+        "options": {}
+      },
+      "id": "pay-pdc-pending-query",
+      "name": "Query Pending PDCs",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [480, 1050],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, pendingPDCs: $json } }}",
+        "options": {}
+      },
+      "id": "pay-pdc-pending-respond",
+      "name": "Respond Pending PDCs",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 1050]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT AccountID, BankName, AccountNumberLast4, AccountDescription, DisplayName, IsDefault FROM BankAccounts WHERE IsActive = 1 ORDER BY IsDefault DESC, BankName;",
+        "options": {}
+      },
+      "id": "pay-bank-query",
+      "name": "Query Bank Accounts",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [480, 1200],
+      "credentials": { "microsoftSql": { "id": "ogLFZe9x98cgGxFy", "name": "InvoiceDB" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, bankAccounts: $json } }}",
+        "options": {}
+      },
+      "id": "pay-bank-respond",
+      "name": "Respond Bank Accounts",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 1200]
+    }
+  ],
+  "connections": {
+    "POST Create Payment": { "main": [[{ "node": "Validate Payment", "type": "main", "index": 0 }]] },
+    "Validate Payment": { "main": [[{ "node": "Check Valid", "type": "main", "index": 0 }]] },
+    "Check Valid": { "main": [[{ "node": "Insert Payment", "type": "main", "index": 0 }], [{ "node": "Respond Error", "type": "main", "index": 0 }]] },
+    "Insert Payment": { "main": [[{ "node": "Update Totals", "type": "main", "index": 0 }]] },
+    "Update Totals": { "main": [[{ "node": "Respond Create", "type": "main", "index": 0 }]] },
+    "GET Payment List": { "main": [[{ "node": "Build List Query", "type": "main", "index": 0 }]] },
+    "Build List Query": { "main": [[{ "node": "Query List", "type": "main", "index": 0 }]] },
+    "Query List": { "main": [[{ "node": "Respond List", "type": "main", "index": 0 }]] },
+    "GET Payment Detail": { "main": [[{ "node": "Get Payment", "type": "main", "index": 0 }]] },
+    "Get Payment": { "main": [[{ "node": "Respond Detail", "type": "main", "index": 0 }]] },
+    "GET Payments by LPO": { "main": [[{ "node": "Query by LPO", "type": "main", "index": 0 }]] },
+    "Query by LPO": { "main": [[{ "node": "Respond by LPO", "type": "main", "index": 0 }]] },
+    "GET Payments by Invoice": { "main": [[{ "node": "Query by Invoice", "type": "main", "index": 0 }]] },
+    "Query by Invoice": { "main": [[{ "node": "Respond by Invoice", "type": "main", "index": 0 }]] },
+    "POST Update PDC Status": { "main": [[{ "node": "Validate PDC Update", "type": "main", "index": 0 }]] },
+    "Validate PDC Update": { "main": [[{ "node": "Update PDC Status", "type": "main", "index": 0 }]] },
+    "Update PDC Status": { "main": [[{ "node": "Respond PDC Update", "type": "main", "index": 0 }]] },
+    "GET Pending PDCs": { "main": [[{ "node": "Query Pending PDCs", "type": "main", "index": 0 }]] },
+    "Query Pending PDCs": { "main": [[{ "node": "Respond Pending PDCs", "type": "main", "index": 0 }]] },
+    "GET Bank Accounts": { "main": [[{ "node": "Query Bank Accounts", "type": "main", "index": 0 }]] },
+    "Query Bank Accounts": { "main": [[{ "node": "Respond Bank Accounts", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "1",
+  "meta": { "instanceId": "fe-invoice-system" },
+  "tags": []
+}

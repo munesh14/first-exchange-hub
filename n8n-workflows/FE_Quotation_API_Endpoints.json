@@ -1,0 +1,673 @@
+{
+  "name": "FE Quotation - API Endpoints",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "quotation-api/upload",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "quot-upload",
+      "name": "POST Upload Quotation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 100],
+      "webhookId": "quot-upload-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "quotation-api/list",
+        "options": {}
+      },
+      "id": "quot-list",
+      "name": "GET Quotation List",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "quot-list-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "quotation-api/get",
+        "options": {}
+      },
+      "id": "quot-get",
+      "name": "GET Quotation Detail",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 500],
+      "webhookId": "quot-get-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "quotation-api/select",
+        "options": {}
+      },
+      "id": "quot-select",
+      "name": "POST Select Quotation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 700],
+      "webhookId": "quot-select-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "quotation-api/create-lpo",
+        "options": {}
+      },
+      "id": "quot-create-lpo",
+      "name": "POST Create LPO from Quotation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 900],
+      "webhookId": "quot-create-lpo-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "DELETE",
+        "path": "quotation-api/delete",
+        "options": {}
+      },
+      "id": "quot-delete",
+      "name": "DELETE Quotation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1100],
+      "webhookId": "quot-delete-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process Upload Input\nconst body = $input.first().json.body || {};\nconst files = $input.first().binary || {};\n\n// Validate required fields\nconst errors = [];\nif (!body.departmentId) errors.push('departmentId is required');\nif (!body.uploadedBy) errors.push('uploadedBy is required');\nif (!files.file) errors.push('file is required');\n\nif (errors.length > 0) {\n  return [{ json: { valid: false, errors } }];\n}\n\n// Generate file path\nconst timestamp = Date.now();\nconst originalName = files.file.fileName || 'quotation.pdf';\nconst ext = originalName.split('.').pop();\nconst storedName = `quotation_${timestamp}.${ext}`;\nconst storedPath = `/data/quotations/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}`;\n\nreturn [{\n  json: {\n    valid: true,\n    departmentId: body.departmentId,\n    branchId: body.branchId || null,\n    categoryId: body.categoryId || null,\n    uploadedBy: body.uploadedBy,\n    notes: body.notes || '',\n    originalFileName: originalName,\n    storedFileName: storedName,\n    storedPath: storedPath,\n    fileType: files.file.mimeType || 'application/pdf'\n  },\n  binary: files\n}];"
+      },
+      "id": "quot-upload-validate",
+      "name": "Validate Upload Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "quot-upload-check",
+      "name": "Check Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Validation failed', details: $json.errors } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "quot-upload-error",
+      "name": "Respond Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "command": "=mkdir -p {{ $json.storedPath }}"
+      },
+      "id": "quot-mkdir",
+      "name": "Create Directory",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [920, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Save binary file to disk\nconst fs = require('fs');\nconst path = require('path');\n\nconst data = $input.first();\nconst filePath = path.join(data.json.storedPath, data.json.storedFileName);\nconst fullPath = `/data/uploads${filePath}`;\n\n// Ensure directory exists\nfs.mkdirSync(path.dirname(fullPath), { recursive: true });\n\n// Write file\nconst fileBuffer = Buffer.from(data.binary.file.data, 'base64');\nfs.writeFileSync(fullPath, fileBuffer);\n\nreturn [{\n  json: {\n    ...data.json,\n    fullFilePath: fullPath,\n    relativeFilePath: filePath\n  },\n  binary: data.binary\n}];"
+      },
+      "id": "quot-save-file",
+      "name": "Save File to Disk",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert at extracting information from vendor quotations. Extract the following fields and return as JSON: quotationNumber, quotationDate (YYYY-MM-DD), validUntil (YYYY-MM-DD or null), vendorName, vendorAddress, vendorContact, vendorEmail, vendorPhone, vendorTRN, currencyCode (default OMR), subTotal, vatAmount, vatPercentage, discountAmount, totalAmount, items (array of: lineNumber, description, quantity, unitOfMeasure, unitPrice, totalPrice). Return ONLY valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"data:{{ $binary.file.mimeType }};base64,{{ $binary.file.data }}\"\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"text\": \"Extract all quotation details from this document.\"\n        }\n      ]\n    }\n  ],\n  \"max_tokens\": 4096\n}",
+        "options": {}
+      },
+      "id": "quot-ai-extract",
+      "name": "OpenAI Extract Quotation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "YJ1y2GjN9R9eAdrv",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI Response\nconst data = $input.first().json;\nconst prevData = $('Save File to Disk').first().json;\n\ntry {\n  const content = data.choices[0].message.content;\n  // Remove markdown code blocks if present\n  const jsonStr = content.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  const extracted = JSON.parse(jsonStr);\n  \n  return [{\n    json: {\n      success: true,\n      extracted: {\n        quotationNumber: extracted.quotationNumber || 'QT-' + Date.now(),\n        quotationDate: extracted.quotationDate || new Date().toISOString().split('T')[0],\n        validUntil: extracted.validUntil || null,\n        vendorName: extracted.vendorName || 'Unknown Vendor',\n        vendorAddress: extracted.vendorAddress || null,\n        vendorContact: extracted.vendorContact || null,\n        vendorEmail: extracted.vendorEmail || null,\n        vendorPhone: extracted.vendorPhone || null,\n        vendorTRN: extracted.vendorTRN || null,\n        currencyCode: extracted.currencyCode || 'OMR',\n        subTotal: parseFloat(extracted.subTotal) || 0,\n        vatAmount: parseFloat(extracted.vatAmount) || 0,\n        vatPercentage: parseFloat(extracted.vatPercentage) || 5.00,\n        discountAmount: parseFloat(extracted.discountAmount) || 0,\n        totalAmount: parseFloat(extracted.totalAmount) || 0,\n        items: extracted.items || []\n      },\n      fileInfo: prevData,\n      aiConfidence: 0.85,\n      aiRawResponse: content\n    }\n  }];\n} catch (e) {\n  return [{\n    json: {\n      success: false,\n      error: 'Failed to parse AI response: ' + e.message,\n      rawResponse: data\n    }\n  }];\n}"
+      },
+      "id": "quot-parse-ai",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Check if vendor exists, create if not\nDECLARE @VendorID INT;\n\nSELECT @VendorID = VendorID FROM Vendors WHERE VendorName = '{{ $json.extracted.vendorName }}';\n\nIF @VendorID IS NULL\nBEGIN\n  INSERT INTO Vendors (VendorName, Address, ContactPerson, Phone, Email, TRN, IsActive, CreatedAt)\n  VALUES (\n    '{{ $json.extracted.vendorName }}',\n    '{{ $json.extracted.vendorAddress || '' }}',\n    '{{ $json.extracted.vendorContact || '' }}',\n    '{{ $json.extracted.vendorPhone || '' }}',\n    '{{ $json.extracted.vendorEmail || '' }}',\n    '{{ $json.extracted.vendorTRN || '' }}',\n    1,\n    GETDATE()\n  );\n  SET @VendorID = SCOPE_IDENTITY();\nEND\n\nSELECT @VendorID AS VendorID;",
+        "options": {}
+      },
+      "id": "quot-check-vendor",
+      "name": "Check or Create Vendor",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1800, 0],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO Quotations (\n  QuotationNumber, QuotationDate, ValidUntil,\n  VendorID, VendorName, VendorAddress, VendorContact, VendorEmail, VendorPhone, VendorTRN,\n  DepartmentID, BranchID, CategoryID,\n  CurrencyCode, SubTotal, VATAmount, VATPercentage, DiscountAmount, TotalAmount,\n  FilePath, FileName, FileType,\n  Status, AIExtractionConfidence, AIRawResponse,\n  UploadedBy, Notes, CreatedAt\n)\nOUTPUT INSERTED.QuotationID, INSERTED.QuotationUUID\nVALUES (\n  '{{ $('Parse AI Response').first().json.extracted.quotationNumber }}',\n  '{{ $('Parse AI Response').first().json.extracted.quotationDate }}',\n  {{ $('Parse AI Response').first().json.extracted.validUntil ? \"'\" + $('Parse AI Response').first().json.extracted.validUntil + \"'\" : 'NULL' }},\n  {{ $json[0].VendorID }},\n  '{{ $('Parse AI Response').first().json.extracted.vendorName }}',\n  '{{ $('Parse AI Response').first().json.extracted.vendorAddress || '' }}',\n  '{{ $('Parse AI Response').first().json.extracted.vendorContact || '' }}',\n  '{{ $('Parse AI Response').first().json.extracted.vendorEmail || '' }}',\n  '{{ $('Parse AI Response').first().json.extracted.vendorPhone || '' }}',\n  '{{ $('Parse AI Response').first().json.extracted.vendorTRN || '' }}',\n  {{ $('Validate Upload Input').first().json.departmentId }},\n  {{ $('Validate Upload Input').first().json.branchId || 'NULL' }},\n  {{ $('Validate Upload Input').first().json.categoryId || 'NULL' }},\n  '{{ $('Parse AI Response').first().json.extracted.currencyCode }}',\n  {{ $('Parse AI Response').first().json.extracted.subTotal }},\n  {{ $('Parse AI Response').first().json.extracted.vatAmount }},\n  {{ $('Parse AI Response').first().json.extracted.vatPercentage }},\n  {{ $('Parse AI Response').first().json.extracted.discountAmount }},\n  {{ $('Parse AI Response').first().json.extracted.totalAmount }},\n  '{{ $('Parse AI Response').first().json.fileInfo.relativeFilePath }}',\n  '{{ $('Parse AI Response').first().json.fileInfo.originalFileName }}',\n  '{{ $('Parse AI Response').first().json.fileInfo.fileType }}',\n  'UPLOADED',\n  {{ $('Parse AI Response').first().json.aiConfidence }},\n  '{{ $('Parse AI Response').first().json.aiRawResponse.replace(/'/g, \"''\") }}',\n  {{ $('Validate Upload Input').first().json.uploadedBy }},\n  '{{ $('Validate Upload Input').first().json.notes || '' }}',\n  GETDATE()\n);",
+        "options": {}
+      },
+      "id": "quot-insert",
+      "name": "Insert Quotation",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2020, 0],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare line items for batch insert\nconst quotResult = $input.first().json;\nconst quotationId = quotResult[0].QuotationID;\nconst items = $('Parse AI Response').first().json.extracted.items || [];\n\nreturn items.map((item, idx) => ({\n  json: {\n    quotationId,\n    lineNumber: item.lineNumber || idx + 1,\n    description: item.description || '',\n    quantity: parseFloat(item.quantity) || 1,\n    unitOfMeasure: item.unitOfMeasure || 'EA',\n    unitPrice: parseFloat(item.unitPrice) || 0,\n    totalPrice: parseFloat(item.totalPrice) || 0\n  }\n}));"
+      },
+      "id": "quot-prep-items",
+      "name": "Prepare Line Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 0]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "quot-loop-items",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [2460, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO QuotationItems (QuotationID, LineNumber, ItemDescription, Quantity, UnitOfMeasure, UnitPrice, TotalPrice)\nVALUES (\n  {{ $json.quotationId }},\n  {{ $json.lineNumber }},\n  '{{ $json.description.replace(/'/g, \"''\") }}',\n  {{ $json.quantity }},\n  '{{ $json.unitOfMeasure }}',\n  {{ $json.unitPrice }},\n  {{ $json.totalPrice }}\n);",
+        "options": {}
+      },
+      "id": "quot-insert-items",
+      "name": "Insert Line Items",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2680, 0],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT q.*, \n  d.DepartmentName,\n  b.BranchName,\n  c.CategoryName,\n  u.FullName AS UploadedByName\nFROM Quotations q\nLEFT JOIN Departments d ON q.DepartmentID = d.DepartmentID\nLEFT JOIN Branches b ON q.BranchID = b.BranchID\nLEFT JOIN ExpenseCategories c ON q.CategoryID = c.CategoryID\nLEFT JOIN Users u ON q.UploadedBy = u.UserID\nWHERE q.QuotationID = {{ $('Insert Quotation').first().json[0].QuotationID }};",
+        "options": {}
+      },
+      "id": "quot-get-summary",
+      "name": "Get Quotation Summary",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [2900, 0],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Quotation uploaded successfully', quotation: $json[0] } }}",
+        "options": {}
+      },
+      "id": "quot-upload-success",
+      "name": "Respond Upload Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3120, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build list query with filters\nconst query = $input.first().json.query || {};\n\nlet whereClause = 'WHERE 1=1';\nif (query.status) whereClause += ` AND q.Status = '${query.status}'`;\nif (query.departmentId) whereClause += ` AND q.DepartmentID = ${query.departmentId}`;\nif (query.branchId) whereClause += ` AND q.BranchID = ${query.branchId}`;\nif (query.vendorId) whereClause += ` AND q.VendorID = ${query.vendorId}`;\nif (query.fromDate) whereClause += ` AND q.QuotationDate >= '${query.fromDate}'`;\nif (query.toDate) whereClause += ` AND q.QuotationDate <= '${query.toDate}'`;\n\nconst limit = query.limit || 50;\nconst offset = query.offset || 0;\n\nreturn [{\n  json: {\n    whereClause,\n    limit,\n    offset\n  }\n}];"
+      },
+      "id": "quot-list-build",
+      "name": "Build List Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  q.QuotationID, q.QuotationUUID, q.QuotationNumber, q.QuotationDate, q.ValidUntil,\n  q.VendorName, q.CurrencyCode, q.TotalAmount, q.Status, q.IsSelected,\n  d.DepartmentName, b.BranchName, c.CategoryName,\n  u.FullName AS UploadedByName, q.UploadedAt\nFROM Quotations q\nLEFT JOIN Departments d ON q.DepartmentID = d.DepartmentID\nLEFT JOIN Branches b ON q.BranchID = b.BranchID\nLEFT JOIN ExpenseCategories c ON q.CategoryID = c.CategoryID\nLEFT JOIN Users u ON q.UploadedBy = u.UserID\n{{ $json.whereClause }}\nORDER BY q.CreatedAt DESC\nOFFSET {{ $json.offset }} ROWS FETCH NEXT {{ $json.limit }} ROWS ONLY;",
+        "options": {}
+      },
+      "id": "quot-list-query",
+      "name": "Query Quotations",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, quotations: $json } }}",
+        "options": {}
+      },
+      "id": "quot-list-respond",
+      "name": "Respond List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate UUID parameter\nconst query = $input.first().json.query || {};\nconst uuid = query.uuid;\n\nif (!uuid) {\n  return [{ json: { valid: false, error: 'uuid parameter is required' } }];\n}\n\nreturn [{ json: { valid: true, uuid } }];"
+      },
+      "id": "quot-get-validate",
+      "name": "Validate UUID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  q.*,\n  d.DepartmentName, b.BranchName, c.CategoryName,\n  u.FullName AS UploadedByName,\n  su.FullName AS SelectedByName,\n  ru.FullName AS ReviewedByName\nFROM Quotations q\nLEFT JOIN Departments d ON q.DepartmentID = d.DepartmentID\nLEFT JOIN Branches b ON q.BranchID = b.BranchID\nLEFT JOIN ExpenseCategories c ON q.CategoryID = c.CategoryID\nLEFT JOIN Users u ON q.UploadedBy = u.UserID\nLEFT JOIN Users su ON q.SelectedBy = su.UserID\nLEFT JOIN Users ru ON q.ReviewedBy = ru.UserID\nWHERE q.QuotationUUID = '{{ $json.uuid }}';",
+        "options": {}
+      },
+      "id": "quot-get-detail",
+      "name": "Get Quotation Detail",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 500],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT * FROM QuotationItems WHERE QuotationID = {{ $json[0].QuotationID }} ORDER BY LineNumber;",
+        "options": {}
+      },
+      "id": "quot-get-items",
+      "name": "Get Quotation Items",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 500],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine quotation with items\nconst quotation = $('Get Quotation Detail').first().json[0];\nconst items = $input.first().json;\n\nif (!quotation) {\n  return [{ json: { success: false, error: 'Quotation not found' } }];\n}\n\nreturn [{\n  json: {\n    success: true,\n    quotation: {\n      ...quotation,\n      items: items\n    }\n  }\n}];"
+      },
+      "id": "quot-get-combine",
+      "name": "Combine Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "quot-get-respond",
+      "name": "Respond Detail",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate select input\nconst body = $input.first().json.body || {};\n\nif (!body.quotationUuid) {\n  return [{ json: { valid: false, error: 'quotationUuid is required' } }];\n}\nif (!body.selectedBy) {\n  return [{ json: { valid: false, error: 'selectedBy is required' } }];\n}\n\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "quot-select-validate",
+      "name": "Validate Select Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 700]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE Quotations SET\n  IsSelected = 1,\n  SelectedBy = {{ $json.selectedBy }},\n  SelectedAt = GETDATE(),\n  SelectionNotes = '{{ $json.selectionNotes || '' }}',\n  Status = 'SELECTED',\n  UpdatedAt = GETDATE()\nWHERE QuotationUUID = '{{ $json.quotationUuid }}';\n\nSELECT q.*, u.FullName AS SelectedByName\nFROM Quotations q\nLEFT JOIN Users u ON q.SelectedBy = u.UserID\nWHERE QuotationUUID = '{{ $json.quotationUuid }}';",
+        "options": {}
+      },
+      "id": "quot-select-update",
+      "name": "Update Selection",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 700],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Quotation selected', quotation: $json[0] } }}",
+        "options": {}
+      },
+      "id": "quot-select-respond",
+      "name": "Respond Select",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate create LPO from quotation\nconst body = $input.first().json.body || {};\n\nif (!body.quotationUuid) {\n  return [{ json: { valid: false, error: 'quotationUuid is required' } }];\n}\nif (!body.createdBy) {\n  return [{ json: { valid: false, error: 'createdBy is required' } }];\n}\n\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "quot-lpo-validate",
+      "name": "Validate Create LPO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 900]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Get quotation details\nSELECT q.*, qi.*\nFROM Quotations q\nLEFT JOIN QuotationItems qi ON q.QuotationID = qi.QuotationID\nWHERE q.QuotationUUID = '{{ $json.quotationUuid }}';",
+        "options": {}
+      },
+      "id": "quot-lpo-get-quot",
+      "name": "Get Quotation for LPO",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 900],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Generate LPO Number\nDECLARE @LPONumber VARCHAR(50);\nDECLARE @Year VARCHAR(4) = CAST(YEAR(GETDATE()) AS VARCHAR);\nDECLARE @Seq INT;\n\nSELECT @Seq = ISNULL(MAX(CAST(RIGHT(LPONumber, 4) AS INT)), 0) + 1\nFROM LocalPurchaseOrders\nWHERE LPONumber LIKE 'LPO-' + @Year + '-%';\n\nSET @LPONumber = 'LPO-' + @Year + '-' + RIGHT('0000' + CAST(@Seq AS VARCHAR), 4);\n\n-- Create LPO from Quotation\nINSERT INTO LocalPurchaseOrders (\n  LPONumber, LPODate, RequestingBranchID, RequestingDepartmentID,\n  VendorID, VendorName, VendorAddress, VendorContact, VendorPhone,\n  QuotationReference, CurrencyCode, SubTotal, VATPercent, VATAmount,\n  DiscountAmount, TotalAmount, StatusID, CreatedBy, CreatedAt, QuotationID\n)\nSELECT\n  @LPONumber, GETDATE(), q.BranchID, q.DepartmentID,\n  q.VendorID, q.VendorName, q.VendorAddress, q.VendorContact, q.VendorPhone,\n  q.QuotationNumber, q.CurrencyCode, q.SubTotal, q.VATPercentage, q.VATAmount,\n  q.DiscountAmount, q.TotalAmount, 1, {{ $('Validate Create LPO').first().json.createdBy }}, GETDATE(), q.QuotationID\nFROM Quotations q\nWHERE q.QuotationUUID = '{{ $('Validate Create LPO').first().json.quotationUuid }}';\n\nDECLARE @LPOID INT = SCOPE_IDENTITY();\n\n-- Update Quotation with LPOID\nUPDATE Quotations SET LPOID = @LPOID, UpdatedAt = GETDATE()\nWHERE QuotationUUID = '{{ $('Validate Create LPO').first().json.quotationUuid }}';\n\nSELECT @LPOID AS LPOID, @LPONumber AS LPONumber;",
+        "options": {}
+      },
+      "id": "quot-lpo-create",
+      "name": "Create LPO",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 900],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Copy quotation items to LPO items\nINSERT INTO LPOItems (LPOID, LineNumber, ItemDescription, CategoryID, Quantity, UnitOfMeasure, UnitPrice, TotalPrice)\nSELECT {{ $json[0].LPOID }}, qi.LineNumber, qi.ItemDescription, qi.CategoryID, qi.Quantity, qi.UnitOfMeasure, qi.UnitPrice, qi.TotalPrice\nFROM QuotationItems qi\nJOIN Quotations q ON qi.QuotationID = q.QuotationID\nWHERE q.QuotationUUID = '{{ $('Validate Create LPO').first().json.quotationUuid }}';\n\n-- Get the created LPO\nSELECT lpo.*, b.BranchName, d.DepartmentName\nFROM LocalPurchaseOrders lpo\nLEFT JOIN Branches b ON lpo.RequestingBranchID = b.BranchID\nLEFT JOIN Departments d ON lpo.RequestingDepartmentID = d.DepartmentID\nWHERE lpo.LPOID = {{ $json[0].LPOID }};",
+        "options": {}
+      },
+      "id": "quot-lpo-items",
+      "name": "Copy Items to LPO",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1140, 900],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'LPO created from quotation', lpo: $json[0] } }}",
+        "options": {}
+      },
+      "id": "quot-lpo-respond",
+      "name": "Respond Create LPO",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate delete\nconst query = $input.first().json.query || {};\n\nif (!query.uuid) {\n  return [{ json: { valid: false, error: 'uuid parameter is required' } }];\n}\n\nreturn [{ json: { valid: true, uuid: query.uuid } }];"
+      },
+      "id": "quot-delete-validate",
+      "name": "Validate Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 1100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Check if quotation can be deleted (not linked to LPO)\nDECLARE @CanDelete BIT = 1;\nDECLARE @QuotID INT;\n\nSELECT @QuotID = QuotationID, @CanDelete = CASE WHEN LPOID IS NULL THEN 1 ELSE 0 END\nFROM Quotations WHERE QuotationUUID = '{{ $json.uuid }}';\n\nIF @CanDelete = 1\nBEGIN\n  DELETE FROM QuotationItems WHERE QuotationID = @QuotID;\n  DELETE FROM Quotations WHERE QuotationID = @QuotID;\n  SELECT 1 AS Deleted, 'Quotation deleted successfully' AS Message;\nEND\nELSE\nBEGIN\n  SELECT 0 AS Deleted, 'Cannot delete quotation - already linked to LPO' AS Message;\nEND",
+        "options": {}
+      },
+      "id": "quot-delete-exec",
+      "name": "Delete Quotation",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 1100],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: $json[0].Deleted === 1, message: $json[0].Message } }}",
+        "options": {}
+      },
+      "id": "quot-delete-respond",
+      "name": "Respond Delete",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 1100]
+    }
+  ],
+  "connections": {
+    "POST Upload Quotation": {
+      "main": [[{ "node": "Validate Upload Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Upload Input": {
+      "main": [[{ "node": "Check Valid", "type": "main", "index": 0 }]]
+    },
+    "Check Valid": {
+      "main": [
+        [{ "node": "Create Directory", "type": "main", "index": 0 }],
+        [{ "node": "Respond Validation Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Directory": {
+      "main": [[{ "node": "Save File to Disk", "type": "main", "index": 0 }]]
+    },
+    "Save File to Disk": {
+      "main": [[{ "node": "OpenAI Extract Quotation", "type": "main", "index": 0 }]]
+    },
+    "OpenAI Extract Quotation": {
+      "main": [[{ "node": "Parse AI Response", "type": "main", "index": 0 }]]
+    },
+    "Parse AI Response": {
+      "main": [[{ "node": "Check or Create Vendor", "type": "main", "index": 0 }]]
+    },
+    "Check or Create Vendor": {
+      "main": [[{ "node": "Insert Quotation", "type": "main", "index": 0 }]]
+    },
+    "Insert Quotation": {
+      "main": [[{ "node": "Prepare Line Items", "type": "main", "index": 0 }]]
+    },
+    "Prepare Line Items": {
+      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+    },
+    "Loop Over Items": {
+      "main": [
+        [{ "node": "Insert Line Items", "type": "main", "index": 0 }],
+        [{ "node": "Get Quotation Summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insert Line Items": {
+      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+    },
+    "Get Quotation Summary": {
+      "main": [[{ "node": "Respond Upload Success", "type": "main", "index": 0 }]]
+    },
+    "GET Quotation List": {
+      "main": [[{ "node": "Build List Query", "type": "main", "index": 0 }]]
+    },
+    "Build List Query": {
+      "main": [[{ "node": "Query Quotations", "type": "main", "index": 0 }]]
+    },
+    "Query Quotations": {
+      "main": [[{ "node": "Respond List", "type": "main", "index": 0 }]]
+    },
+    "GET Quotation Detail": {
+      "main": [[{ "node": "Validate UUID", "type": "main", "index": 0 }]]
+    },
+    "Validate UUID": {
+      "main": [[{ "node": "Get Quotation Detail", "type": "main", "index": 0 }]]
+    },
+    "Get Quotation Detail": {
+      "main": [[{ "node": "Get Quotation Items", "type": "main", "index": 0 }]]
+    },
+    "Get Quotation Items": {
+      "main": [[{ "node": "Combine Data", "type": "main", "index": 0 }]]
+    },
+    "Combine Data": {
+      "main": [[{ "node": "Respond Detail", "type": "main", "index": 0 }]]
+    },
+    "POST Select Quotation": {
+      "main": [[{ "node": "Validate Select Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Select Input": {
+      "main": [[{ "node": "Update Selection", "type": "main", "index": 0 }]]
+    },
+    "Update Selection": {
+      "main": [[{ "node": "Respond Select", "type": "main", "index": 0 }]]
+    },
+    "POST Create LPO from Quotation": {
+      "main": [[{ "node": "Validate Create LPO", "type": "main", "index": 0 }]]
+    },
+    "Validate Create LPO": {
+      "main": [[{ "node": "Get Quotation for LPO", "type": "main", "index": 0 }]]
+    },
+    "Get Quotation for LPO": {
+      "main": [[{ "node": "Create LPO", "type": "main", "index": 0 }]]
+    },
+    "Create LPO": {
+      "main": [[{ "node": "Copy Items to LPO", "type": "main", "index": 0 }]]
+    },
+    "Copy Items to LPO": {
+      "main": [[{ "node": "Respond Create LPO", "type": "main", "index": 0 }]]
+    },
+    "DELETE Quotation": {
+      "main": [[{ "node": "Validate Delete", "type": "main", "index": 0 }]]
+    },
+    "Validate Delete": {
+      "main": [[{ "node": "Delete Quotation", "type": "main", "index": 0 }]]
+    },
+    "Delete Quotation": {
+      "main": [[{ "node": "Respond Delete", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": "fe-invoice-system"
+  },
+  "tags": []
+}

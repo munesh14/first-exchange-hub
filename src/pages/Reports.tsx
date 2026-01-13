@@ -33,6 +33,7 @@ import {
   BarChart3,
   PieChart,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   BarChart,
@@ -90,7 +91,7 @@ export default function Reports() {
     return <Navigate to="/" replace />;
   }
 
-  const { data: departments } = useQuery({
+  const { data: departments, refetch: refetchDepartments } = useQuery({
     queryKey: ['departments'],
     queryFn: api.getDepartments,
   });
@@ -108,7 +109,7 @@ export default function Reports() {
     }
   };
 
-  const { data: report, isLoading } = useQuery({
+  const { data: report, isLoading, refetch: refetchReport, isFetching } = useQuery({
     queryKey: ['report', reportType, getReportParams()],
     queryFn: () => {
       const params = getReportParams();
@@ -121,6 +122,11 @@ export default function Reports() {
       }
     },
   });
+
+  const handleRefresh = () => {
+    refetchDepartments();
+    refetchReport();
+  };
 
   const exportToExcel = () => {
     if (!report) return;
@@ -245,6 +251,10 @@ export default function Reports() {
         breadcrumbs={[{ label: 'Reports' }]}
         actions={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh} disabled={isFetching} className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Button variant="outline" onClick={exportToExcel} disabled={!report} className="gap-2">
               <FileSpreadsheet className="w-4 h-4" />
               Export Excel

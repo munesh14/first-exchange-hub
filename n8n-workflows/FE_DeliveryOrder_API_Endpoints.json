@@ -1,0 +1,562 @@
+{
+  "name": "FE Delivery Order - API Endpoints",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "do-api/create",
+        "options": {}
+      },
+      "id": "do-create",
+      "name": "POST Create DO",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 100],
+      "webhookId": "do-create-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "do-api/list",
+        "options": {}
+      },
+      "id": "do-list",
+      "name": "GET DO List",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "do-list-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "do-api/get",
+        "options": {}
+      },
+      "id": "do-get",
+      "name": "GET DO Detail",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 500],
+      "webhookId": "do-get-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "do-api/by-lpo",
+        "options": {}
+      },
+      "id": "do-by-lpo",
+      "name": "GET DO by LPO",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 700],
+      "webhookId": "do-by-lpo-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "do-api/by-invoice",
+        "options": {}
+      },
+      "id": "do-by-invoice",
+      "name": "GET DO by Invoice",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 900],
+      "webhookId": "do-by-invoice-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "do-api/receive-items",
+        "options": {}
+      },
+      "id": "do-receive",
+      "name": "POST Receive Items",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1100],
+      "webhookId": "do-receive-webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "do-api/create-assets",
+        "options": {}
+      },
+      "id": "do-create-assets",
+      "name": "POST Create Assets from DO",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 1300],
+      "webhookId": "do-create-assets-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate Create DO input\nconst body = $input.first().json.body || {};\nconst errors = [];\n\nif (!body.doNumber) errors.push('doNumber is required');\nif (!body.doDate) errors.push('doDate is required');\nif (!body.vendorName) errors.push('vendorName is required');\nif (!body.departmentId) errors.push('departmentId is required');\nif (!body.receivedBy) errors.push('receivedBy is required');\nif (!body.createdBy) errors.push('createdBy is required');\nif (!body.lpoId && !body.invoiceId) errors.push('Either lpoId or invoiceId is required');\nif (!body.items || body.items.length === 0) errors.push('At least one item is required');\n\nif (errors.length > 0) {\n  return [{ json: { valid: false, errors } }];\n}\n\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "do-create-validate",
+      "name": "Validate Create DO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "check", "leftValue": "={{ $json.valid }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "do-create-check",
+      "name": "Check Valid Create",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Validation failed', details: $json.errors } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "do-create-error",
+      "name": "Respond Create Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Get vendor ID or create\nDECLARE @VendorID INT;\nSELECT @VendorID = VendorID FROM Vendors WHERE VendorName = '{{ $json.vendorName }}';\nIF @VendorID IS NULL\nBEGIN\n  INSERT INTO Vendors (VendorName, IsActive, CreatedAt) VALUES ('{{ $json.vendorName }}', 1, GETDATE());\n  SET @VendorID = SCOPE_IDENTITY();\nEND\n\n-- Create Delivery Order\nINSERT INTO DeliveryOrders (\n  DONumber, DODate, ReceivedDate, LPOID, InvoiceID,\n  VendorID, VendorName, DeliveryAddress, ReceivedBy, ReceivedByUserID,\n  DepartmentID, BranchID, Status, Notes, CreatedBy, CreatedAt\n)\nOUTPUT INSERTED.DOID, INSERTED.DOUUID\nVALUES (\n  '{{ $json.doNumber }}',\n  '{{ $json.doDate }}',\n  '{{ $json.receivedDate || $json.doDate }}',\n  {{ $json.lpoId || 'NULL' }},\n  {{ $json.invoiceId || 'NULL' }},\n  @VendorID,\n  '{{ $json.vendorName }}',\n  '{{ $json.deliveryAddress || '' }}',\n  '{{ $json.receivedBy }}',\n  {{ $json.receivedByUserId || 'NULL' }},\n  {{ $json.departmentId }},\n  {{ $json.branchId || 'NULL' }},\n  'PARTIAL',\n  '{{ $json.notes || '' }}',\n  {{ $json.createdBy }},\n  GETDATE()\n);",
+        "options": {}
+      },
+      "id": "do-create-insert",
+      "name": "Insert DO",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 0],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare DO items for insert\nconst doResult = $input.first().json;\nconst doId = doResult[0].DOID;\nconst items = $('Validate Create DO').first().json.items || [];\n\nreturn items.map((item, idx) => ({\n  json: {\n    doId,\n    lineNumber: item.lineNumber || idx + 1,\n    lpoItemId: item.lpoItemId || null,\n    invoiceItemId: item.invoiceItemId || null,\n    description: item.description || '',\n    quantityOrdered: parseFloat(item.quantityOrdered) || 0,\n    quantityReceived: parseFloat(item.quantityReceived) || 0,\n    unitOfMeasure: item.unitOfMeasure || 'EA',\n    unitPrice: parseFloat(item.unitPrice) || 0,\n    condition: item.condition || 'NEW',\n    serialNumber: item.serialNumber || null\n  }\n}));"
+      },
+      "id": "do-prep-items",
+      "name": "Prepare DO Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 0]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "do-loop-items",
+      "name": "Loop DO Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1360, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO DeliveryOrderItems (\n  DOID, LPOItemID, InvoiceItemID, LineNumber, ItemDescription,\n  QuantityOrdered, QuantityReceived, UnitOfMeasure, UnitPrice,\n  Condition, SerialNumber\n)\nVALUES (\n  {{ $json.doId }},\n  {{ $json.lpoItemId || 'NULL' }},\n  {{ $json.invoiceItemId || 'NULL' }},\n  {{ $json.lineNumber }},\n  '{{ $json.description.replace(/'/g, \"''\") }}',\n  {{ $json.quantityOrdered }},\n  {{ $json.quantityReceived }},\n  '{{ $json.unitOfMeasure }}',\n  {{ $json.unitPrice }},\n  '{{ $json.condition }}',\n  {{ $json.serialNumber ? \"'\" + $json.serialNumber + \"'\" : 'NULL' }}\n);",
+        "options": {}
+      },
+      "id": "do-insert-items",
+      "name": "Insert DO Items",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1580, 0],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Update DO totals and status\nUPDATE DeliveryOrders SET\n  TotalItemsOrdered = (SELECT COUNT(*) FROM DeliveryOrderItems WHERE DOID = {{ $('Insert DO').first().json[0].DOID }}),\n  TotalItemsReceived = (SELECT COUNT(*) FROM DeliveryOrderItems WHERE DOID = {{ $('Insert DO').first().json[0].DOID }} AND QuantityReceived >= QuantityOrdered),\n  Status = CASE \n    WHEN (SELECT COUNT(*) FROM DeliveryOrderItems WHERE DOID = {{ $('Insert DO').first().json[0].DOID }} AND QuantityReceived < QuantityOrdered) = 0 THEN 'COMPLETE'\n    ELSE 'PARTIAL'\n  END\nWHERE DOID = {{ $('Insert DO').first().json[0].DOID }};\n\nSELECT d.*, dept.DepartmentName, b.BranchName\nFROM DeliveryOrders d\nLEFT JOIN Departments dept ON d.DepartmentID = dept.DepartmentID\nLEFT JOIN Branches b ON d.BranchID = b.BranchID\nWHERE d.DOID = {{ $('Insert DO').first().json[0].DOID }};",
+        "options": {}
+      },
+      "id": "do-update-totals",
+      "name": "Update DO Totals",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1800, 0],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Delivery Order created', deliveryOrder: $json[0] } }}",
+        "options": {}
+      },
+      "id": "do-create-respond",
+      "name": "Respond Create DO",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2020, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build list query\nconst query = $input.first().json.query || {};\nlet where = 'WHERE 1=1';\nif (query.status) where += ` AND d.Status = '${query.status}'`;\nif (query.departmentId) where += ` AND d.DepartmentID = ${query.departmentId}`;\nif (query.fromDate) where += ` AND d.DODate >= '${query.fromDate}'`;\nif (query.toDate) where += ` AND d.DODate <= '${query.toDate}'`;\n\nreturn [{ json: { where, limit: query.limit || 50, offset: query.offset || 0 } }];"
+      },
+      "id": "do-list-build",
+      "name": "Build DO List Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT d.DOID, d.DOUUID, d.DONumber, d.DODate, d.ReceivedDate,\n  d.VendorName, d.Status, d.TotalItemsOrdered, d.TotalItemsReceived,\n  dept.DepartmentName, b.BranchName, u.FullName AS CreatedByName,\n  lpo.LPONumber, inv.InvoiceNumber\nFROM DeliveryOrders d\nLEFT JOIN Departments dept ON d.DepartmentID = dept.DepartmentID\nLEFT JOIN Branches b ON d.BranchID = b.BranchID\nLEFT JOIN Users u ON d.CreatedBy = u.UserID\nLEFT JOIN LocalPurchaseOrders lpo ON d.LPOID = lpo.LPOID\nLEFT JOIN Invoices inv ON d.InvoiceID = inv.InvoiceID\n{{ $json.where }}\nORDER BY d.CreatedAt DESC\nOFFSET {{ $json.offset }} ROWS FETCH NEXT {{ $json.limit }} ROWS ONLY;",
+        "options": {}
+      },
+      "id": "do-list-query",
+      "name": "Query DO List",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, deliveryOrders: $json } }}",
+        "options": {}
+      },
+      "id": "do-list-respond",
+      "name": "Respond DO List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nif (!query.uuid) return [{ json: { valid: false, error: 'uuid required' } }];\nreturn [{ json: { valid: true, uuid: query.uuid } }];"
+      },
+      "id": "do-get-validate",
+      "name": "Validate DO UUID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT d.*, dept.DepartmentName, b.BranchName, u.FullName AS CreatedByName,\n  ru.FullName AS ReceivedByUserName, lpo.LPONumber, inv.InvoiceNumber\nFROM DeliveryOrders d\nLEFT JOIN Departments dept ON d.DepartmentID = dept.DepartmentID\nLEFT JOIN Branches b ON d.BranchID = b.BranchID\nLEFT JOIN Users u ON d.CreatedBy = u.UserID\nLEFT JOIN Users ru ON d.ReceivedByUserID = ru.UserID\nLEFT JOIN LocalPurchaseOrders lpo ON d.LPOID = lpo.LPOID\nLEFT JOIN Invoices inv ON d.InvoiceID = inv.InvoiceID\nWHERE d.DOUUID = '{{ $json.uuid }}';",
+        "options": {}
+      },
+      "id": "do-get-detail",
+      "name": "Get DO Detail",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 500],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT doi.*, li.ItemDescription AS LPOItemDescription\nFROM DeliveryOrderItems doi\nLEFT JOIN LPOItems li ON doi.LPOItemID = li.LPOItemID\nWHERE doi.DOID = {{ $json[0].DOID }}\nORDER BY doi.LineNumber;",
+        "options": {}
+      },
+      "id": "do-get-items",
+      "name": "Get DO Items",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [920, 500],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const doDetail = $('Get DO Detail').first().json[0];\nconst items = $input.first().json;\nif (!doDetail) return [{ json: { success: false, error: 'DO not found' } }];\nreturn [{ json: { success: true, deliveryOrder: { ...doDetail, items } } }];"
+      },
+      "id": "do-get-combine",
+      "name": "Combine DO Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "do-get-respond",
+      "name": "Respond DO Detail",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT d.*, dept.DepartmentName, b.BranchName\nFROM DeliveryOrders d\nLEFT JOIN Departments dept ON d.DepartmentID = dept.DepartmentID\nLEFT JOIN Branches b ON d.BranchID = b.BranchID\nWHERE d.LPOID = {{ $input.first().json.query.lpoid || 0 }};",
+        "options": {}
+      },
+      "id": "do-by-lpo-query",
+      "name": "Query DO by LPO",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [480, 700],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, deliveryOrder: $json[0] || null } }}",
+        "options": {}
+      },
+      "id": "do-by-lpo-respond",
+      "name": "Respond DO by LPO",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 700]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT d.*, dept.DepartmentName, b.BranchName\nFROM DeliveryOrders d\nLEFT JOIN Departments dept ON d.DepartmentID = dept.DepartmentID\nLEFT JOIN Branches b ON d.BranchID = b.BranchID\nWHERE d.InvoiceID = {{ $input.first().json.query.invoiceid || 0 }};",
+        "options": {}
+      },
+      "id": "do-by-inv-query",
+      "name": "Query DO by Invoice",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [480, 900],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, deliveryOrder: $json[0] || null } }}",
+        "options": {}
+      },
+      "id": "do-by-inv-respond",
+      "name": "Respond DO by Invoice",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate receive items\nconst body = $input.first().json.body || {};\nif (!body.doUuid) return [{ json: { valid: false, error: 'doUuid required' } }];\nif (!body.receivedBy) return [{ json: { valid: false, error: 'receivedBy required' } }];\nif (!body.items || body.items.length === 0) return [{ json: { valid: false, error: 'items required' } }];\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "do-receive-validate",
+      "name": "Validate Receive",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 1100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT DOID FROM DeliveryOrders WHERE DOUUID = '{{ $json.doUuid }}';",
+        "options": {}
+      },
+      "id": "do-receive-get-id",
+      "name": "Get DO ID",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 1100],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare items for update\nconst doId = $input.first().json[0]?.DOID;\nconst items = $('Validate Receive').first().json.items || [];\nconst receivedBy = $('Validate Receive').first().json.receivedBy;\n\nreturn items.map(item => ({\n  json: {\n    doId,\n    doItemId: item.doItemId,\n    quantityReceived: parseFloat(item.quantityReceived) || 0,\n    condition: item.condition || 'NEW',\n    serialNumber: item.serialNumber || null,\n    notes: item.notes || '',\n    receivedBy\n  }\n}));"
+      },
+      "id": "do-receive-prep",
+      "name": "Prepare Receive Updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 1100]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "do-receive-loop",
+      "name": "Loop Receive Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1140, 1100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Update DO Item\nUPDATE DeliveryOrderItems SET\n  QuantityReceived = QuantityReceived + {{ $json.quantityReceived }},\n  Condition = '{{ $json.condition }}',\n  SerialNumber = {{ $json.serialNumber ? \"'\" + $json.serialNumber + \"'\" : 'SerialNumber' }}\nWHERE DOItemID = {{ $json.doItemId }};\n\n-- Log receipt\nINSERT INTO DeliveryReceiptLog (DOItemID, ReceiptDate, QuantityReceived, Condition, SerialNumbers, ReceivedBy, Notes)\nVALUES (\n  {{ $json.doItemId }},\n  GETDATE(),\n  {{ $json.quantityReceived }},\n  '{{ $json.condition }}',\n  {{ $json.serialNumber ? \"'\" + $json.serialNumber + \"'\" : 'NULL' }},\n  {{ $json.receivedBy }},\n  '{{ $json.notes }}'\n);",
+        "options": {}
+      },
+      "id": "do-receive-update",
+      "name": "Update Receipt",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1360, 1100],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=-- Update DO status\nDECLARE @DOID INT = {{ $('Get DO ID').first().json[0].DOID }};\n\nUPDATE DeliveryOrders SET\n  TotalItemsReceived = (SELECT COUNT(*) FROM DeliveryOrderItems WHERE DOID = @DOID AND QuantityReceived >= QuantityOrdered),\n  Status = CASE \n    WHEN (SELECT COUNT(*) FROM DeliveryOrderItems WHERE DOID = @DOID AND QuantityReceived < QuantityOrdered) = 0 THEN 'COMPLETE'\n    ELSE 'PARTIAL'\n  END,\n  UpdatedAt = GETDATE()\nWHERE DOID = @DOID;\n\nSELECT * FROM DeliveryOrders WHERE DOID = @DOID;",
+        "options": {}
+      },
+      "id": "do-receive-finalize",
+      "name": "Finalize Receipt",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [1580, 1100],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Items received', deliveryOrder: $json[0] } }}",
+        "options": {}
+      },
+      "id": "do-receive-respond",
+      "name": "Respond Receive",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1800, 1100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate create assets\nconst body = $input.first().json.body || {};\nif (!body.doUuid) return [{ json: { valid: false, error: 'doUuid required' } }];\nif (!body.createdBy) return [{ json: { valid: false, error: 'createdBy required' } }];\nreturn [{ json: { valid: true, ...body } }];"
+      },
+      "id": "do-assets-validate",
+      "name": "Validate Create Assets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 1300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=DECLARE @DOID INT;\nSELECT @DOID = DOID FROM DeliveryOrders WHERE DOUUID = '{{ $json.doUuid }}';\n\nEXEC sp_CreateAssetsFromDO @DOID = @DOID, @CreatedByUserID = {{ $json.createdBy }};\n\nSELECT a.AssetID, a.AssetUUID, a.AssetName, a.AssetTag, a.StatusID\nFROM Assets a WHERE a.DOID = @DOID;",
+        "options": {}
+      },
+      "id": "do-assets-exec",
+      "name": "Execute Create Assets",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1,
+      "position": [700, 1300],
+      "credentials": {
+        "microsoftSql": {
+          "id": "ogLFZe9x98cgGxFy",
+          "name": "InvoiceDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Assets created from DO', assets: $json } }}",
+        "options": {}
+      },
+      "id": "do-assets-respond",
+      "name": "Respond Create Assets",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 1300]
+    }
+  ],
+  "connections": {
+    "POST Create DO": { "main": [[{ "node": "Validate Create DO", "type": "main", "index": 0 }]] },
+    "Validate Create DO": { "main": [[{ "node": "Check Valid Create", "type": "main", "index": 0 }]] },
+    "Check Valid Create": { "main": [[{ "node": "Insert DO", "type": "main", "index": 0 }], [{ "node": "Respond Create Error", "type": "main", "index": 0 }]] },
+    "Insert DO": { "main": [[{ "node": "Prepare DO Items", "type": "main", "index": 0 }]] },
+    "Prepare DO Items": { "main": [[{ "node": "Loop DO Items", "type": "main", "index": 0 }]] },
+    "Loop DO Items": { "main": [[{ "node": "Insert DO Items", "type": "main", "index": 0 }], [{ "node": "Update DO Totals", "type": "main", "index": 0 }]] },
+    "Insert DO Items": { "main": [[{ "node": "Loop DO Items", "type": "main", "index": 0 }]] },
+    "Update DO Totals": { "main": [[{ "node": "Respond Create DO", "type": "main", "index": 0 }]] },
+    "GET DO List": { "main": [[{ "node": "Build DO List Query", "type": "main", "index": 0 }]] },
+    "Build DO List Query": { "main": [[{ "node": "Query DO List", "type": "main", "index": 0 }]] },
+    "Query DO List": { "main": [[{ "node": "Respond DO List", "type": "main", "index": 0 }]] },
+    "GET DO Detail": { "main": [[{ "node": "Validate DO UUID", "type": "main", "index": 0 }]] },
+    "Validate DO UUID": { "main": [[{ "node": "Get DO Detail", "type": "main", "index": 0 }]] },
+    "Get DO Detail": { "main": [[{ "node": "Get DO Items", "type": "main", "index": 0 }]] },
+    "Get DO Items": { "main": [[{ "node": "Combine DO Data", "type": "main", "index": 0 }]] },
+    "Combine DO Data": { "main": [[{ "node": "Respond DO Detail", "type": "main", "index": 0 }]] },
+    "GET DO by LPO": { "main": [[{ "node": "Query DO by LPO", "type": "main", "index": 0 }]] },
+    "Query DO by LPO": { "main": [[{ "node": "Respond DO by LPO", "type": "main", "index": 0 }]] },
+    "GET DO by Invoice": { "main": [[{ "node": "Query DO by Invoice", "type": "main", "index": 0 }]] },
+    "Query DO by Invoice": { "main": [[{ "node": "Respond DO by Invoice", "type": "main", "index": 0 }]] },
+    "POST Receive Items": { "main": [[{ "node": "Validate Receive", "type": "main", "index": 0 }]] },
+    "Validate Receive": { "main": [[{ "node": "Get DO ID", "type": "main", "index": 0 }]] },
+    "Get DO ID": { "main": [[{ "node": "Prepare Receive Updates", "type": "main", "index": 0 }]] },
+    "Prepare Receive Updates": { "main": [[{ "node": "Loop Receive Items", "type": "main", "index": 0 }]] },
+    "Loop Receive Items": { "main": [[{ "node": "Update Receipt", "type": "main", "index": 0 }], [{ "node": "Finalize Receipt", "type": "main", "index": 0 }]] },
+    "Update Receipt": { "main": [[{ "node": "Loop Receive Items", "type": "main", "index": 0 }]] },
+    "Finalize Receipt": { "main": [[{ "node": "Respond Receive", "type": "main", "index": 0 }]] },
+    "POST Create Assets from DO": { "main": [[{ "node": "Validate Create Assets", "type": "main", "index": 0 }]] },
+    "Validate Create Assets": { "main": [[{ "node": "Execute Create Assets", "type": "main", "index": 0 }]] },
+    "Execute Create Assets": { "main": [[{ "node": "Respond Create Assets", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "1",
+  "meta": { "instanceId": "fe-invoice-system" },
+  "tags": []
+}

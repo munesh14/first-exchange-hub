@@ -76,7 +76,7 @@ export default function AssetDetail() {
     return <Navigate to="/" replace />;
   }
 
-  const { data: assetData, isLoading } = useQuery({
+  const { data: assetData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['asset', uuid],
     queryFn: () => api.getAsset(uuid!),
     enabled: !!uuid,
@@ -155,6 +155,10 @@ export default function AssetDetail() {
         ]}
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <span
               className={cn(
                 'status-badge text-sm',
