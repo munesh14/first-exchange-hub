@@ -1,4 +1,11 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://firstxehub:3004/webhook';
+// Auto-detect API base URL based on how dashboard is accessed
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+};
+
+const API_BASE_URL = getApiBase();
 
 // Fallback users for development when API is unavailable
 const FALLBACK_USERS = [
@@ -45,7 +52,7 @@ async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Promise<T
 // Fetch users with fallback
 async function fetchUsersWithFallback(): Promise<User[]> {
   try {
-    const users = await apiCall<User[]>('/invoice-api/users');
+    const users = await apiCall<User[]>('/users');
     return users;
   } catch (error) {
     console.log('API unavailable, using fallback users');
@@ -232,18 +239,18 @@ export const api = {
   getUsers: fetchUsersWithFallback,
   
   // Departments
-  getDepartments: () => apiCall<Department[]>('/invoice-api/departments'),
+  getDepartments: () => apiCall<Department[]>('/departments'),
   
   // Categories
-  getCategories: () => apiCall<Category[]>('/invoice-api/categories'),
+  getCategories: () => apiCall<Category[]>('/categories'),
   
   // Vendors
-  getVendors: () => apiCall<Vendor[]>('/invoice-api/vendors'),
+  getVendors: () => apiCall<Vendor[]>('/vendors'),
   createVendor: (vendor: Omit<Vendor, 'VendorID'>) => 
-    apiCall<Vendor>('/invoice-api/vendor', { method: 'POST', body: vendor }),
+    apiCall<Vendor>('/vendor', { method: 'POST', body: vendor }),
   
   // Stats
-  getStats: () => apiCall<Stats>('/invoice-api/stats'),
+  getStats: () => apiCall<Stats>('/stats'),
   
   // Invoices
   getInvoices: (params?: { status?: string; department?: string }) => {
@@ -251,13 +258,13 @@ export const api = {
     if (params?.status) queryParams.append('status', params.status);
     if (params?.department) queryParams.append('department', params.department);
     const queryString = queryParams.toString();
-    return apiCall<Invoice[]>(`/invoice-api/invoices${queryString ? `?${queryString}` : ''}`);
+    return apiCall<Invoice[]>(`/invoices${queryString ? `?${queryString}` : ''}`);
   },
   
-  getInvoice: (uuid: string) => apiCall<InvoiceDetail>(`/invoice-api/get-invoice?uuid=${uuid}`),
+  getInvoice: (uuid: string) => apiCall<InvoiceDetail>(`/get-invoice?uuid=${uuid}`),
   
   getInvoiceFile: (path: string) => 
-    apiCall<{ success: boolean; fileName: string; mimeType: string; data: string }>(`/invoice-api/file?path=${encodeURIComponent(path)}`),
+    apiCall<{ success: boolean; fileName: string; mimeType: string; data: string }>(`/file?path=${encodeURIComponent(path)}`),
   
   uploadInvoice: (data: {
     file: string;
@@ -266,38 +273,38 @@ export const api = {
     departmentId: number;
     userId: number;
     categoryId: number;
-  }) => apiCall<{ uuid: string }>('/invoice-upload', { method: 'POST', body: data }),
+  }) => apiCall<{ uuid: string }>('/invoices/upload', { method: 'POST', body: data }),
   
   updateInvoice: (data: { invoiceUuid: string; updates: Partial<Invoice> & { items?: InvoiceItem[] }; userId: number }) =>
-    apiCall<{ success: boolean }>('/invoice-api/invoice/update', { method: 'POST', body: data }),
+    apiCall<{ success: boolean }>('/invoice/update', { method: 'POST', body: data }),
   
   submitInvoice: (data: { invoiceUuid: string; userId: number; comment?: string }) =>
-    apiCall<{ success: boolean }>('/invoice-api/invoice/submit', { method: 'POST', body: data }),
+    apiCall<{ success: boolean }>('/invoice/submit', { method: 'POST', body: data }),
   
   approveInvoice: (data: { invoiceUuid: string; action: 'approve' | 'reject' | 'correction'; userId: number; comment?: string; omrAmount?: number }) =>
-    apiCall<{ success: boolean }>('/invoice-api/invoice/approve', { method: 'POST', body: data }),
+    apiCall<{ success: boolean }>('/invoice/approve', { method: 'POST', body: data }),
   
   // Reports
   getDailyReport: (date: string, departmentId?: number) => {
     const params = new URLSearchParams({ date });
     if (departmentId) params.append('departmentId', departmentId.toString());
-    return apiCall<Report>(`/invoice-api/report/daily?${params.toString()}`);
+    return apiCall<Report>(`/report/daily?${params.toString()}`);
   },
   
   getWeeklyReport: (weekStart: string, departmentId?: number) => {
     const params = new URLSearchParams({ weekStart });
     if (departmentId) params.append('departmentId', departmentId.toString());
-    return apiCall<Report>(`/invoice-api/report/weekly?${params.toString()}`);
+    return apiCall<Report>(`/report/weekly?${params.toString()}`);
   },
   
   getMonthlyReport: (year: number, month: number, departmentId?: number) => {
     const params = new URLSearchParams({ year: year.toString(), month: month.toString() });
     if (departmentId) params.append('departmentId', departmentId.toString());
-    return apiCall<Report>(`/invoice-api/report/monthly?${params.toString()}`);
+    return apiCall<Report>(`/report/monthly?${params.toString()}`);
   },
   
   // Assets
-  getAssetStats: () => apiCall<AssetStats>('/invoice-api/asset-stats'),
+  getAssetStats: () => apiCall<AssetStats>('/asset-stats'),
   
   getAssets: (params?: { department?: string; status?: string; category?: string }) => {
     const queryParams = new URLSearchParams();
@@ -305,27 +312,27 @@ export const api = {
     if (params?.status) queryParams.append('status', params.status);
     if (params?.category) queryParams.append('category', params.category);
     const queryString = queryParams.toString();
-    return apiCall<Asset[]>(`/invoice-api/assets${queryString ? `?${queryString}` : ''}`);
+    return apiCall<Asset[]>(`/assets${queryString ? `?${queryString}` : ''}`);
   },
   
-  getAsset: (uuid: string) => apiCall<AssetDetail>(`/invoice-api/asset/${uuid}`),
+  getAsset: (uuid: string) => apiCall<AssetDetail>(`/asset/${uuid}`),
   
   updateAsset: (data: Partial<Asset>) =>
-    apiCall<Asset>('/invoice-api/asset/update', { method: 'POST', body: data }),
+    apiCall<Asset>('/asset/update', { method: 'POST', body: data }),
   
   updateAssetStatus: (uuid: string, status: string, reason?: string) =>
-    apiCall<Asset>('/invoice-api/asset/status', { method: 'POST', body: { uuid, status, reason } }),
+    apiCall<Asset>('/asset/status', { method: 'POST', body: { uuid, status, reason } }),
   
   transferAsset: (uuid: string, departmentId: number, locationId: number) =>
-    apiCall<Asset>('/invoice-api/asset/transfer', { method: 'POST', body: { uuid, departmentId, locationId } }),
+    apiCall<Asset>('/asset/transfer', { method: 'POST', body: { uuid, departmentId, locationId } }),
   
-  getWarrantyExpiring: () => apiCall<Asset[]>('/invoice-api/assets/warranty-expiring'),
+  getWarrantyExpiring: () => apiCall<Asset[]>('/assets/warranty-expiring'),
   
   getAssetSummaryReport: (departmentId?: number) => {
     const params = departmentId ? `?departmentId=${departmentId}` : '';
-    return apiCall<Report>(`/invoice-api/report/asset-summary${params}`);
+    return apiCall<Report>(`/report/asset-summary${params}`);
   },
   
   // Locations
-  getLocations: () => apiCall<Location[]>('/invoice-api/locations'),
+  getLocations: () => apiCall<Location[]>('/locations'),
 };

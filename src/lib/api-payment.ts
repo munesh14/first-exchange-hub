@@ -1,6 +1,13 @@
 // Payment API Client
 
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+// Auto-detect API base URL based on how dashboard is accessed
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+};
+
+const API_BASE = getApiBase();
 
 export interface Payment {
   PaymentID: number;
@@ -76,18 +83,18 @@ export async function getPayments(params?: {
   if (params?.dateFrom) searchParams.append('dateFrom', params.dateFrom);
   if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
 
-  const url = `${API_BASE}/payment-api/payments${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+  const url = `${API_BASE}/payments${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
   const response = await fetch(url);
   return response.json();
 }
 
 export async function getPaymentModes(): Promise<PaymentMode[]> {
-  const response = await fetch(`${API_BASE}/payment-api/modes`);
+  const response = await fetch(`${API_BASE}/payments/modes`);
   return response.json();
 }
 
 export async function getBankAccounts(): Promise<BankAccount[]> {
-  const response = await fetch(`${API_BASE}/payment-api/bank-accounts`);
+  const response = await fetch(`${API_BASE}/payments/bank-accounts`);
   return response.json();
 }
 
@@ -96,7 +103,7 @@ export async function recordPayment(data: RecordPaymentData): Promise<{
   paymentId?: number;
   error?: string;
 }> {
-  const response = await fetch(`${API_BASE}/payment-api/payment/record`, {
+  const response = await fetch(`${API_BASE}/payments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -109,15 +116,15 @@ export async function updatePDCStatus(
   status: string,
   date?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE}/payment-api/pdc/update-status`, {
-    method: 'POST',
+  const response = await fetch(`${API_BASE}/payments/${paymentUuid}/pdc-status`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ paymentUuid, status, date }),
+    body: JSON.stringify({ status, date }),
   });
   return response.json();
 }
 
 export async function getPDCTracker(): Promise<Payment[]> {
-  const response = await fetch(`${API_BASE}/payment-api/pdc/tracker`);
+  const response = await fetch(`${API_BASE}/payments/pdc-tracker`);
   return response.json();
 }

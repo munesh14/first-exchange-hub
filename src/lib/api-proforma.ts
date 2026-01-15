@@ -1,6 +1,13 @@
 // Proforma Invoice API Client
 
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+// Auto-detect API base URL based on how dashboard is accessed
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+};
+
+const API_BASE = getApiBase();
 
 export interface ProformaInvoice {
   ProformaID: number;
@@ -33,17 +40,17 @@ export async function getProformaInvoices(params?: {
   if (params?.lpo) searchParams.append('lpo', params.lpo);
   if (params?.vendor) searchParams.append('vendor', params.vendor);
 
-  const url = `${API_BASE}/proforma-api/proforma-invoices${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+  const url = `${API_BASE}/proforma-invoices${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
   const response = await fetch(url);
   return response.json();
 }
 
 export async function getProformaInvoice(uuid: string): Promise<{ proforma: ProformaInvoice }> {
-  const response = await fetch(`${API_BASE}/proforma-api/proforma?uuid=${uuid}`);
+  const response = await fetch(`${API_BASE}/proforma-invoices/${uuid}`);
   return response.json();
 }
 
 export function downloadProformaFile(uuid: string): void {
-  const url = `${API_BASE}/proforma-api/proforma/download?uuid=${uuid}`;
+  const url = `${API_BASE}/proforma-invoices/${uuid}/download`;
   window.open(url, '_blank');
 }

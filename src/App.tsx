@@ -1,3 +1,5 @@
+import ChainList from './pages/ChainList';
+import ChainDetail from './pages/ChainDetail';
 import LPOList from './pages/LPOList';
 import LPOCreate from './pages/LPOCreate';
 import LPODetail from './pages/LPODetail';
@@ -39,8 +41,14 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route element={<Layout />}>
-              {/* Dashboard & Invoices */}
+              {/* Dashboard */}
               <Route path="/" element={<Dashboard />} />
+
+              {/* Procurement Chains */}
+              <Route path="/chains" element={<ChainList />} />
+              <Route path="/chains/:uuid" element={<ChainDetail />} />
+
+              {/* Invoices */}
               <Route path="/upload" element={<UploadInvoice />} />
               <Route path="/invoices" element={<InvoiceList />} />
               <Route path="/invoices/:invoiceUuid" element={<InvoiceDetail />} />

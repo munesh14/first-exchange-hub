@@ -1,6 +1,13 @@
 // LPO API Client - Add to your existing api.ts or import separately
 
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+// Auto-detect API base URL based on how dashboard is accessed
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+};
+
+const API_BASE = getApiBase();
 
 // ============================================
 // LPO API
@@ -129,20 +136,20 @@ export async function getLPOs(params?: {
   if (params?.dateFrom) searchParams.append('dateFrom', params.dateFrom);
   if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
   
-  const url = `${API_BASE}/lpo-api/lpos${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+  const url = `${API_BASE}/lpos${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
   const response = await fetch(url);
   return response.json();
 }
 
 // Get LPO by UUID
 export async function getLPO(uuid: string): Promise<{ lpo: LPO; items: LPOItem[]; receipts: LPOReceipt[] }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo?uuid=${uuid}`);  // CORRECT
+  const response = await fetch(`${API_BASE}/lpos/${uuid}`);
   return response.json();
 }
 
 // Create new LPO
 export async function createLPO(data: CreateLPOData): Promise<{ success: boolean; LPOID?: number; LPONumber?: string; LPOUUID?: string; error?: string }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo/create`, {
+  const response = await fetch(`${API_BASE}/lpos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -165,17 +172,17 @@ export async function createLPO(data: CreateLPOData): Promise<{ success: boolean
 
 // Update LPO
 export async function updateLPO(uuid: string, userId: number, data: Partial<CreateLPOData> & { items?: any[]; deletedItemIds?: any[] }): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo/update`, {
-    method: 'POST',
+  const response = await fetch(`${API_BASE}/lpos/${uuid}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lpoUuid: uuid, userId, ...data }),
+    body: JSON.stringify({ userId, ...data }),
   });
   return response.json();
 }
 
 // Submit LPO for approval
 export async function submitLPO(uuid: string, userId: number, comment?: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo/submit`, {
+  const response = await fetch(`${API_BASE}/lpos/${uuid}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lpoUuid: uuid, userId, comment }),
@@ -185,18 +192,18 @@ export async function submitLPO(uuid: string, userId: number, comment?: string):
 
 // Approve LPO - level determined by current status
 export async function approveLPO(uuid: string, userId: number, level: 'department' | 'gm' | 'accounts', comment?: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo/approve`, {
+  const response = await fetch(`${API_BASE}/lpos/${uuid}/approve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lpoUuid: uuid, userId, level, comments: comment }),
+    body: JSON.stringify({ userId, level, comments: comment }),
   });
-  
+
   const text = await response.text();
   if (!text) {
     // Empty response but HTTP 200 means success
     return { success: response.ok };
   }
-  
+
   try {
     return JSON.parse(text);
   } catch (e) {
@@ -207,7 +214,7 @@ export async function approveLPO(uuid: string, userId: number, level: 'departmen
 
 // Reject LPO
 export async function rejectLPO(uuid: string, userId: number, reason: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo/reject`, {
+  const response = await fetch(`${API_BASE}/lpos/${uuid}/reject`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lpoUuid: uuid, userId, reason }),
@@ -224,10 +231,10 @@ export async function rejectLPO(uuid: string, userId: number, reason: string): P
 
 // Send LPO to vendor
 export async function sendLPOToVendor(uuid: string, userId: number): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo/send-to-vendor`, {
+  const response = await fetch(`${API_BASE}/lpos/${uuid}/send-to-vendor`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lpoUuid: uuid, userId }),
+    body: JSON.stringify({ userId }),
   });
   return response.json();
 }
@@ -244,7 +251,7 @@ export async function receiveGoods(data: {
   serialNumbers?: string[];
   notes?: string;
 }): Promise<{ success: boolean; receiptId: number; assetsCreated: { assetId: number; assetTag: string }[] }> {
-  const response = await fetch(`${API_BASE}/lpo-api/lpo/receive`, {
+  const response = await fetch(`${API_BASE}/lpos/receive`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -268,7 +275,7 @@ export async function getLPOStats(): Promise<{
   TotalValuePending: number;
   TotalValueApproved: number;
 }> {
-  const response = await fetch(`${API_BASE}/lpo-api/stats`);
+  const response = await fetch(`${API_BASE}/lpos/stats`);
   return response.json();
 }
 
@@ -280,7 +287,7 @@ export async function uploadQuotation(file: File, branchId: number, departmentId
   confidenceScore: number;
 }> {
   const base64 = await fileToBase64(file);
-  const response = await fetch(`${API_BASE}/lpo-upload`, {
+  const response = await fetch(`${API_BASE}/lpos/upload`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -318,15 +325,15 @@ export interface Vendor {
 }
 
 export async function getVendors(search?: string): Promise<Vendor[]> {
-  const url = search 
-    ? `${API_BASE}/vendor-api/vendors?search=${encodeURIComponent(search)}`
-    : `${API_BASE}/vendor-api/vendors`;
+  const url = search
+    ? `${API_BASE}/vendors?search=${encodeURIComponent(search)}`
+    : `${API_BASE}/vendors`;
   const response = await fetch(url);
   return response.json();
 }
 
 export async function createVendor(data: Partial<Vendor>): Promise<{ success: boolean; vendorId: number }> {
-  const response = await fetch(`${API_BASE}/vendor-api/vendor/create`, {
+  const response = await fetch(`${API_BASE}/vendors`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -365,12 +372,12 @@ export interface PaymentMode {
 }
 
 export async function getPaymentModes(): Promise<PaymentMode[]> {
-  const response = await fetch(`${API_BASE}/payment-api/modes`);
+  const response = await fetch(`${API_BASE}/payments/modes`);
   return response.json();
 }
 
 export async function getInvoicePayments(invoiceUuid: string): Promise<{ invoice: any; payments: Payment[]; summary: any }> {
-  const response = await fetch(`${API_BASE}/payment-api/invoice/${invoiceUuid}/payments`);
+  const response = await fetch(`${API_BASE}/invoices/${invoiceUuid}/payments`);
   return response.json();
 }
 
@@ -385,7 +392,7 @@ export async function recordPayment(data: {
   notes?: string;
   recordedBy: number;
 }): Promise<{ success: boolean; paymentId: number }> {
-  const response = await fetch(`${API_BASE}/payment-api/payment/record`, {
+  const response = await fetch(`${API_BASE}/payments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -394,7 +401,7 @@ export async function recordPayment(data: {
 }
 
 export async function getOverdueInvoices(): Promise<any[]> {
-  const response = await fetch(`${API_BASE}/payment-api/overdue`);
+  const response = await fetch(`${API_BASE}/payments/overdue`);
   return response.json();
 }
 
@@ -427,20 +434,20 @@ export interface Category {
 }
 
 export async function getBranches(): Promise<Branch[]> {
-  const response = await fetch(`${API_BASE}/lpo-api/branches`);
+  const response = await fetch(`${API_BASE}/branches`);
   return response.json();
 }
 
 export async function getDepartments(branchId?: number): Promise<Department[]> {
-  const url = branchId 
-    ? `${API_BASE}/lpo-api/departments?branchId=${branchId}`
-    : `${API_BASE}/lpo-api/departments`;
+  const url = branchId
+    ? `${API_BASE}/departments?branchId=${branchId}`
+    : `${API_BASE}/departments`;
   const response = await fetch(url);
   return response.json();
 }
 
 export async function getCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_BASE}/invoice-api/categories`);
+  const response = await fetch(`${API_BASE}/categories`);
   return response.json();
 }
 
@@ -469,7 +476,7 @@ function fileToBase64(file: File): Promise<string> {
  * Opens PDF in new tab (browser will handle download via Content-Disposition header)
  */
 export function downloadLPOPdf(uuid: string): void {
-  const url = `${API_BASE}/lpo-api/lpo/pdf?uuid=${uuid}`;
+  const url = `${API_BASE}/lpos/${uuid}/pdf`;
   window.open(url, '_blank');
 }
 
@@ -477,5 +484,5 @@ export function downloadLPOPdf(uuid: string): void {
  * Get PDF URL for opening in new tab
  */
 export function getLPOPdfUrl(uuid: string): string {
-  return `${API_BASE}/lpo-api/lpo/pdf?uuid=${uuid}`;
+  return `${API_BASE}/lpos/${uuid}/pdf`;
 }

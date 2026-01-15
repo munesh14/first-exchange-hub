@@ -1,6 +1,13 @@
 // Delivery Order API Client
 
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+// Auto-detect API base URL based on how dashboard is accessed
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+};
+
+const API_BASE = getApiBase();
 
 // ============================================
 // DELIVERY ORDER TYPES
@@ -120,7 +127,7 @@ export async function getDeliveryOrders(params?: {
   if (params?.dateFrom) searchParams.append('dateFrom', params.dateFrom);
   if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
 
-  const url = `${API_BASE}/do-api/delivery-orders${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+  const url = `${API_BASE}/delivery-orders${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
   const response = await fetch(url);
   return response.json();
 }
@@ -131,7 +138,7 @@ export async function getDeliveryOrder(uuid: string): Promise<{
   items: DeliveryOrderItem[];
   receipts: DeliveryOrderReceipt[];
 }> {
-  const response = await fetch(`${API_BASE}/do-api/delivery-order?uuid=${uuid}`);
+  const response = await fetch(`${API_BASE}/delivery-orders/${uuid}`);
   return response.json();
 }
 
@@ -145,7 +152,7 @@ export async function createDeliveryOrder(
   doNumber?: string;
   error?: string;
 }> {
-  const response = await fetch(`${API_BASE}/do-api/delivery-order/create`, {
+  const response = await fetch(`${API_BASE}/delivery-orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -163,7 +170,7 @@ export async function receiveDeliveryItems(
   assetsCreated?: { assetId: number; assetTag: string }[];
   error?: string;
 }> {
-  const response = await fetch(`${API_BASE}/do-api/delivery-order/receive`, {
+  const response = await fetch(`${API_BASE}/delivery-orders/receive`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -177,7 +184,7 @@ export async function completeDeliveryOrder(
   uuid: string,
   userId: number
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE}/do-api/delivery-order/complete`, {
+  const response = await fetch(`${API_BASE}/delivery-orders/${uuid}/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ doUuid: uuid, userId }),
@@ -192,10 +199,10 @@ export async function cancelDeliveryOrder(
   userId: number,
   reason: string
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE}/do-api/delivery-order/cancel`, {
+  const response = await fetch(`${API_BASE}/delivery-orders/${uuid}/cancel`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ doUuid: uuid, userId, reason }),
+    body: JSON.stringify({ userId, reason }),
   });
 
   return response.json();
@@ -209,6 +216,6 @@ export async function getDeliveryOrderStats(): Promise<{
   FullyReceived: number;
   Completed: number;
 }> {
-  const response = await fetch(`${API_BASE}/do-api/stats`);
+  const response = await fetch(`${API_BASE}/delivery-orders/stats`);
   return response.json();
 }

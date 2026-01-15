@@ -344,7 +344,7 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose"
+            "typeValidation": "strict"
           },
           "conditions": [
             {
@@ -352,8 +352,8 @@
               "leftValue": "={{ $json.ChainID }}",
               "rightValue": "",
               "operator": {
-                "type": "any",
-                "operation": "notEmpty"
+                "type": "string",
+                "operation": "exists"
               }
             }
           ],
@@ -370,7 +370,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT \n  QuotationID,\n  CONVERT(VARCHAR(36), QuotationUUID) AS QuotationUUID,\n  QuotationNumber,\n  VendorName,\n  QuotationDate,\n  ValidUntil,\n  TotalAmount,\n  CurrencyCode,\n  Status,\n  FilePath,\n  CreatedAt\nFROM Quotations \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY CreatedAt;",
+        "query": "=SELECT \n  QuotationID,\n  CONVERT(VARCHAR(36), QuotationUUID) AS QuotationUUID,\n  QuotationNumber,\n  VendorName,\n  QuotationDate,\n  ValidUntil,\n  TotalAmount,\n  CurrencyCode,\n  StatusID,\n  FilePath,\n  CreatedAt\nFROM Quotations \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY CreatedAt;",
         "options": {
           "alwaysOutputData": true
         }
@@ -390,7 +390,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT \n  l.LPOID,\n  CONVERT(VARCHAR(36), l.LPOUUID) AS LPOUUID,\n  l.LPONumber,\n  l.VendorName,\n  l.LPODate,\n  l.ExpectedDeliveryDate,\n  l.TotalAmount,\n  l.CurrencyCode,\n  l.StatusID,\n  l.FilePath,\n  l.ChainSequence,\n  l.CreatedAt\nFROM LocalPurchaseOrders l \nWHERE l.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY l.ChainSequence;",
+        "query": "=SELECT \n  l.LPOID,\n  CONVERT(VARCHAR(36), l.LPOUUID) AS LPOUUID,\n  l.LPONumber,\n  l.VendorName,\n  l.LPODate,\n  l.DeliveryDate,\n  l.TotalAmount,\n  l.CurrencyCode,\n  l.ApprovalStatus,\n  CASE \n    WHEN l.ApprovalStatus = 'Approved' THEN 'APPROVED'\n    WHEN l.ApprovalStatus = 'Rejected' THEN 'REJECTED'\n    ELSE 'PENDING' \n  END AS StatusCode,\n  l.ApprovedBy,\n  l.ApprovedAt,\n  l.FilePath,\n  l.ChainSequence,\n  l.CreatedAt\nFROM LocalPurchaseOrders l \nWHERE l.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY l.ChainSequence;",
         "options": {
           "alwaysOutputData": true
         }
@@ -410,7 +410,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT \n  DOID,\n  CONVERT(VARCHAR(36), DOUUID) AS DOUUID,\n  DONumber,\n  VendorName,\n  DODate,\n  ReceivedBy,\n  ReceivedDate,\n  Status,\n  FilePath,\n  Notes,\n  CreatedAt\nFROM DeliveryOrders \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY CreatedAt;",
+        "query": "=SELECT \n  DeliveryOrderID,\n  CONVERT(VARCHAR(36), DeliveryOrderUUID) AS DeliveryOrderUUID,\n  DONumber,\n  VendorName,\n  DeliveryDate,\n  ReceivedBy,\n  ReceivedAt,\n  StatusID,\n  FilePath,\n  Notes,\n  CreatedAt\nFROM DeliveryOrders \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY CreatedAt;",
         "options": {
           "alwaysOutputData": true
         }
@@ -430,7 +430,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT \n  i.InvoiceID,\n  CONVERT(VARCHAR(36), i.InvoiceUUID) AS InvoiceUUID,\n  i.InvoiceNumber,\n  i.VendorNameExtracted AS VendorName,\n  i.InvoiceDate,\n  i.PaymentDueDate,\n  i.TotalAmount,\n  i.CurrencyCode,\n  i.StatusID,\n  s.StatusCode,\n  s.StatusName,\n  i.FilePath,\n  i.CreatedAt\nFROM Invoices i\nLEFT JOIN InvoiceStatus s ON i.StatusID = s.StatusID\nWHERE i.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY i.CreatedAt;",
+        "query": "=SELECT \n  i.InvoiceID,\n  CONVERT(VARCHAR(36), i.InvoiceUUID) AS InvoiceUUID,\n  i.InvoiceNumber,\n  i.VendorNameExtracted AS VendorName,\n  i.InvoiceDate,\n  i.DueDate,\n  i.TotalAmount,\n  i.CurrencyCode,\n  i.StatusID,\n  s.StatusCode,\n  s.StatusName,\n  i.FilePath,\n  i.CreatedAt\nFROM Invoices i\nLEFT JOIN InvoiceStatus s ON i.StatusID = s.StatusID\nWHERE i.ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY i.CreatedAt;",
         "options": {
           "alwaysOutputData": true
         }
@@ -450,7 +450,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT \n  PaymentID,\n  CONVERT(VARCHAR(36), PaymentUUID) AS PaymentUUID,\n  ReferenceNumber,\n  PaymentDate,\n  Amount,\n  CurrencyCode,\n  PaymentMethod,\n  BankName,\n  ChequeNumber,\n  ChequeDate,\n  Status,\n  Notes,\n  CreatedAt\nFROM Payments \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY PaymentDate;",
+        "query": "=SELECT \n  PaymentID,\n  CONVERT(VARCHAR(36), PaymentUUID) AS PaymentUUID,\n  PaymentReference,\n  PaymentDate,\n  Amount,\n  CurrencyCode,\n  PaymentMethod,\n  BankName,\n  ChequeNumber,\n  ChequeDate,\n  StatusID,\n  Notes,\n  CreatedAt\nFROM Payments \nWHERE ChainID = {{ $('Get Chain Details').item.json.ChainID }}\nORDER BY PaymentDate;",
         "options": {
           "alwaysOutputData": true
         }

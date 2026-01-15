@@ -1,6 +1,13 @@
 // Quotation API Client
 
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+// Auto-detect API base URL based on how dashboard is accessed
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+};
+
+const API_BASE = getApiBase();
 
 // ============================================
 // QUOTATION TYPES
@@ -86,7 +93,7 @@ export async function getQuotations(params?: {
   if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
   if (params?.isSelected !== undefined) searchParams.append('isSelected', params.isSelected.toString());
 
-  const url = `${API_BASE}/quotation-api/quotations${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+  const url = `${API_BASE}/quotations${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
   const response = await fetch(url);
   return response.json();
 }
@@ -96,8 +103,18 @@ export async function getQuotation(uuid: string): Promise<{
   quotation: Quotation;
   items: QuotationItem[];
 }> {
-  const response = await fetch(`${API_BASE}/quotation-api/quotation?uuid=${uuid}`);
-  return response.json();
+  const response = await fetch(`${API_BASE}/quotations/${uuid}`);
+  const result = await response.json();
+
+  // Handle Express API response format: { success, data: { quotation, lineItems } }
+  if (!result.success || !result.data) {
+    throw new Error('Quotation not found');
+  }
+
+  return {
+    quotation: result.data.quotation,
+    items: result.data.lineItems || []
+  };
 }
 
 // Upload quotation file for AI extraction
@@ -121,7 +138,7 @@ export async function uploadQuotationFile(
   formData.append('uploadedBy', data.uploadedBy.toString());
   if (data.notes) formData.append('notes', data.notes);
 
-  const response = await fetch(`${API_BASE}/quotation-api/upload`, {
+  const response = await fetch(`${API_BASE}/quotations/upload`, {
     method: 'POST',
     body: formData,
   });
@@ -135,7 +152,7 @@ export async function selectQuotation(
   userId: number,
   selectionNotes?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE}/quotation-api/quotation/select`, {
+  const response = await fetch(`${API_BASE}/quotations/${uuid}/select`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -164,7 +181,7 @@ export async function createLPOFromQuotation(
   lpoNumber?: string;
   error?: string;
 }> {
-  const response = await fetch(`${API_BASE}/quotation-api/quotation/create-lpo`, {
+  const response = await fetch(`${API_BASE}/quotations/${quotationUuid}/create-lpo`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -182,11 +199,10 @@ export async function deleteQuotation(
   uuid: string,
   userId: number
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE}/quotation-api/quotation/delete`, {
-    method: 'POST',
+  const response = await fetch(`${API_BASE}/quotations/${uuid}`, {
+    method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      quotationUuid: uuid,
       userId,
     }),
   });
@@ -202,12 +218,12 @@ export async function getQuotationStats(): Promise<{
   TotalValue: number;
   SelectedValue: number;
 }> {
-  const response = await fetch(`${API_BASE}/quotation-api/stats`);
+  const response = await fetch(`${API_BASE}/quotations/stats`);
   return response.json();
 }
 
 // Download quotation file
 export function downloadQuotationFile(uuid: string): void {
-  const url = `${API_BASE}/quotation-api/quotation/download?uuid=${uuid}`;
+  const url = `${API_BASE}/quotations/${uuid}/download`;
   window.open(url, '_blank');
 }

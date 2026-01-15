@@ -21,6 +21,7 @@ import {
   Wallet,
   Package,
   Link2,
+  Plus,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,6 +34,14 @@ import feLogo from '@/assets/fe_logo.png';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+];
+
+const chainItems = [
+  { path: '/chains', label: 'All Chains', icon: Link2 },
+  { path: '/chains/new', label: 'New Chain', icon: Plus },
+];
+
+const documentItems = [
   { path: '/upload', label: 'Upload Invoice', icon: Upload },
   { path: '/invoices', label: 'All Invoices', icon: FileText },
   { path: '/pending', label: 'Pending Review', icon: Clock },
@@ -85,6 +94,44 @@ export function AppSidebar() {
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin">
         {/* Main Items */}
         {navItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn('nav-item', isActive && 'nav-item-active')
+            }
+          >
+            <item.icon className="w-5 h-5" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+
+        {/* Procurement Chains Section */}
+        <div className="pt-4 pb-2">
+          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            Procurement Chains
+          </p>
+        </div>
+        {chainItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn('nav-item', isActive && 'nav-item-active')
+            }
+          >
+            <item.icon className="w-5 h-5" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+
+        {/* Documents Section */}
+        <div className="pt-4 pb-2">
+          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            Documents
+          </p>
+        </div>
+        {documentItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

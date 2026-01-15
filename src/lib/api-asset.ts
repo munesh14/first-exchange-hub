@@ -1,6 +1,13 @@
 // Asset API Client
 
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+// Auto-detect API base URL based on how dashboard is accessed
+const getApiBase = () => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+};
+
+const API_BASE = getApiBase();
 
 export interface Asset {
   AssetID: number;
@@ -24,7 +31,7 @@ export interface Asset {
 }
 
 export async function getPendingAssets(): Promise<Asset[]> {
-  const response = await fetch(`${API_BASE}/asset-api/pending`);
+  const response = await fetch(`${API_BASE}/assets/pending`);
   return response.json();
 }
 
@@ -33,10 +40,10 @@ export async function putAssetToUse(
   putToUseDate: string,
   userId: number
 ): Promise<{ success: boolean; assetTag?: string; error?: string }> {
-  const response = await fetch(`${API_BASE}/asset-api/put-to-use`, {
+  const response = await fetch(`${API_BASE}/assets/${assetUuid}/put-to-use`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ assetUuid, putToUseDate, userId }),
+    body: JSON.stringify({ putToUseDate, userId }),
   });
   return response.json();
 }
@@ -53,7 +60,7 @@ export async function getAssets(params?: {
   if (params?.department) searchParams.append('department', params.department);
   if (params?.category) searchParams.append('category', params.category);
 
-  const url = `${API_BASE}/asset-api/assets${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+  const url = `${API_BASE}/assets${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
   const response = await fetch(url);
   return response.json();
 }
