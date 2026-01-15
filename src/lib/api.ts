@@ -52,8 +52,8 @@ async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Promise<T
 // Fetch users with fallback
 async function fetchUsersWithFallback(): Promise<User[]> {
   try {
-    const users = await apiCall<User[]>('/users');
-    return users;
+    const response = await apiCall<{ success: boolean; data: User[] }>('/lookups/users');
+    return response.data || [];
   } catch (error) {
     console.log('API unavailable, using fallback users');
     return FALLBACK_USERS;
@@ -239,29 +239,64 @@ export const api = {
   getUsers: fetchUsersWithFallback,
   
   // Departments
-  getDepartments: () => apiCall<Department[]>('/departments'),
+  getDepartments: async () => {
+    const response = await apiCall<{ success: boolean; data: Department[] }>('/lookups/departments');
+    return response.data || [];
+  },
   
   // Categories
-  getCategories: () => apiCall<Category[]>('/categories'),
+  getCategories: async () => {
+    const response = await apiCall<{ success: boolean; data: Category[] }>('/lookups/categories');
+    return response.data || [];
+  },
   
   // Vendors
-  getVendors: () => apiCall<Vendor[]>('/vendors'),
-  createVendor: (vendor: Omit<Vendor, 'VendorID'>) => 
+  getVendors: async () => {
+    const response = await apiCall<{ success: boolean; data: Vendor[] }>('/lookups/vendors');
+    return response.data || [];
+  },
+  createVendor: (vendor: Omit<Vendor, 'VendorID'>) =>
     apiCall<Vendor>('/vendor', { method: 'POST', body: vendor }),
   
   // Stats
-  getStats: () => apiCall<Stats>('/stats'),
+  getStats: async () => {
+    // Compute stats from invoices list
+    const response = await apiCall<{ success: boolean; data: { invoices: Invoice[]; total: number } }>('/invoices');
+    const invoices = response.data?.invoices || [];
+
+    const pendingReview = invoices.filter(i => i.StatusID === 2).length;
+    const pendingApproval = invoices.filter(i => i.StatusID === 3).length;
+    const approved = invoices.filter(i => i.StatusID === 4).length;
+    const rejected = invoices.filter(i => i.StatusID === 5).length;
+    const correctionNeeded = invoices.filter(i => i.StatusID === 6).length;
+    const totalApprovedAmount = invoices
+      .filter(i => i.StatusID === 4)
+      .reduce((sum, i) => sum + (i.TotalAmountOMR || 0), 0);
+
+    return {
+      pendingReview,
+      pendingApproval,
+      approved,
+      rejected,
+      correctionNeeded,
+      totalApprovedAmount,
+    };
+  },
   
   // Invoices
-  getInvoices: (params?: { status?: string; department?: string }) => {
+  getInvoices: async (params?: { status?: string; department?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.department) queryParams.append('department', params.department);
     const queryString = queryParams.toString();
-    return apiCall<Invoice[]>(`/invoices${queryString ? `?${queryString}` : ''}`);
+    const response = await apiCall<{ success: boolean; data: { invoices: Invoice[]; total: number } }>(`/invoices${queryString ? `?${queryString}` : ''}`);
+    return response.data?.invoices || [];
   },
   
-  getInvoice: (uuid: string) => apiCall<InvoiceDetail>(`/get-invoice?uuid=${uuid}`),
+  getInvoice: async (uuid: string) => {
+    const response = await apiCall<{ success: boolean; data: InvoiceDetail }>(`/invoices/${uuid}`);
+    return response.data;
+  },
   
   getInvoiceFile: (path: string) => 
     apiCall<{ success: boolean; fileName: string; mimeType: string; data: string }>(`/file?path=${encodeURIComponent(path)}`),
@@ -304,15 +339,42 @@ export const api = {
   },
   
   // Assets
-  getAssetStats: () => apiCall<AssetStats>('/asset-stats'),
-  
-  getAssets: (params?: { department?: string; status?: string; category?: string }) => {
+  getAssetStats: async () => {
+    // Compute stats from assets list
+    const response = await apiCall<{ success: boolean; data: Asset[] }>('/assets');
+    const assets = response.data || [];
+
+    const activeAssets = assets.filter(a => a.StatusID === 2).length;
+    const underRepair = assets.filter(a => a.StatusID === 4).length;
+    const disposed = assets.filter(a => a.StatusID === 5).length;
+    const totalPurchaseValue = assets.reduce((sum, a) => sum + (a.PurchasePriceOMR || 0), 0);
+    const currentBookValue = assets.reduce((sum, a) => sum + (a.CurrentBookValue || 0), 0);
+    const warrantyExpiringSoon = assets.filter(a => {
+      if (!a.WarrantyExpiryDate) return false;
+      const expiryDate = new Date(a.WarrantyExpiryDate);
+      const now = new Date();
+      const daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
+    }).length;
+
+    return {
+      activeAssets,
+      underRepair,
+      disposed,
+      totalPurchaseValue,
+      currentBookValue,
+      warrantyExpiringSoon,
+    };
+  },
+
+  getAssets: async (params?: { department?: string; status?: string; category?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.department) queryParams.append('department', params.department);
     if (params?.status) queryParams.append('status', params.status);
     if (params?.category) queryParams.append('category', params.category);
     const queryString = queryParams.toString();
-    return apiCall<Asset[]>(`/assets${queryString ? `?${queryString}` : ''}`);
+    const response = await apiCall<{ success: boolean; data: Asset[] }>(`/assets${queryString ? `?${queryString}` : ''}`);
+    return response.data || [];
   },
   
   getAsset: (uuid: string) => apiCall<AssetDetail>(`/asset/${uuid}`),

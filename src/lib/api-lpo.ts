@@ -1,5 +1,8 @@
 // LPO API Client - Add to your existing api.ts or import separately
 
+// Import lookup functions from centralized lookup API
+export * from './api-lookup';
+
 // Auto-detect API base URL based on how dashboard is accessed
 const getApiBase = () => {
   const hostname = window.location.hostname;
@@ -305,41 +308,7 @@ export async function uploadQuotation(file: File, branchId: number, departmentId
 // ============================================
 // VENDOR API
 // ============================================
-
-export interface Vendor {
-  VendorID: number;
-  VendorUUID: string;
-  VendorCode: string | null;
-  VendorName: string;
-  TradeName: string | null;
-  ContactPerson: string | null;
-  Phone: string | null;
-  Mobile: string | null;
-  Email: string | null;
-  Address: string | null;
-  City: string | null;
-  Country: string;
-  TaxNumber: string | null;
-  CRNumber: string | null;
-  IsActive: boolean;
-}
-
-export async function getVendors(search?: string): Promise<Vendor[]> {
-  const url = search
-    ? `${API_BASE}/vendors?search=${encodeURIComponent(search)}`
-    : `${API_BASE}/vendors`;
-  const response = await fetch(url);
-  return response.json();
-}
-
-export async function createVendor(data: Partial<Vendor>): Promise<{ success: boolean; vendorId: number }> {
-  const response = await fetch(`${API_BASE}/vendors`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  return response.json();
-}
+// Vendor types and functions now imported from api-lookup.ts
 
 // ============================================
 // PAYMENT API
@@ -363,18 +332,7 @@ export interface Payment {
   RecordedAt: string;
 }
 
-export interface PaymentMode {
-  ModeID: number;
-  ModeCode: string;
-  ModeName: string;
-  RequiresReference: boolean;
-  IsActive: boolean;
-}
-
-export async function getPaymentModes(): Promise<PaymentMode[]> {
-  const response = await fetch(`${API_BASE}/payments/modes`);
-  return response.json();
-}
+// PaymentMode interface and getPaymentModes() now imported from api-lookup.ts
 
 export async function getInvoicePayments(invoiceUuid: string): Promise<{ invoice: any; payments: Payment[]; summary: any }> {
   const response = await fetch(`${API_BASE}/invoices/${invoiceUuid}/payments`);
@@ -408,48 +366,7 @@ export async function getOverdueInvoices(): Promise<any[]> {
 // ============================================
 // LOOKUP DATA
 // ============================================
-
-export interface Branch {
-  BranchID: number;
-  BranchCode: string;
-  BranchName: string;
-  BranchType: string;
-  IsActive: boolean;
-}
-
-export interface Department {
-  DepartmentID: number;
-  DepartmentCode: string;
-  DepartmentName: string;
-  BranchID: number;
-  IsActive: boolean;
-}
-
-export interface Category {
-  CategoryID: number;
-  CategoryCode: string;
-  CategoryName: string;
-  IsAssetCategory: boolean;
-  DepreciationRatePercent: number;
-}
-
-export async function getBranches(): Promise<Branch[]> {
-  const response = await fetch(`${API_BASE}/branches`);
-  return response.json();
-}
-
-export async function getDepartments(branchId?: number): Promise<Department[]> {
-  const url = branchId
-    ? `${API_BASE}/departments?branchId=${branchId}`
-    : `${API_BASE}/departments`;
-  const response = await fetch(url);
-  return response.json();
-}
-
-export async function getCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_BASE}/categories`);
-  return response.json();
-}
+// Branch, Department, Category interfaces and lookup functions now imported from api-lookup.ts
 
 // ============================================
 // HELPERS

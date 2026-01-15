@@ -1,5 +1,13 @@
 // Payment API Client
 
+// Import types and functions from centralized lookup API
+import type { PaymentMode, BankAccount } from './api-lookup';
+import { getPaymentModes, getBankAccounts } from './api-lookup';
+
+// Re-export for backward compatibility
+export type { PaymentMode, BankAccount };
+export { getPaymentModes, getBankAccounts };
+
 // Auto-detect API base URL based on how dashboard is accessed
 const getApiBase = () => {
   const hostname = window.location.hostname;
@@ -36,22 +44,7 @@ export interface Payment {
   RecordedAt: string;
 }
 
-export interface PaymentMode {
-  ModeID: number;
-  ModeCode: string;
-  ModeName: string;
-  RequiresReference: boolean;
-  IsActive: boolean;
-}
-
-export interface BankAccount {
-  BankAccountID: number;
-  BankName: string;
-  AccountNumber: string;
-  AccountName: string;
-  BranchName: string | null;
-  IsActive: boolean;
-}
+// PaymentMode and BankAccount interfaces now imported from api-lookup.ts
 
 export interface RecordPaymentData {
   invoiceId?: number;
@@ -88,15 +81,7 @@ export async function getPayments(params?: {
   return response.json();
 }
 
-export async function getPaymentModes(): Promise<PaymentMode[]> {
-  const response = await fetch(`${API_BASE}/payments/modes`);
-  return response.json();
-}
-
-export async function getBankAccounts(): Promise<BankAccount[]> {
-  const response = await fetch(`${API_BASE}/payments/bank-accounts`);
-  return response.json();
-}
+// getPaymentModes() and getBankAccounts() now imported from api-lookup.ts
 
 export async function recordPayment(data: RecordPaymentData): Promise<{
   success: boolean;

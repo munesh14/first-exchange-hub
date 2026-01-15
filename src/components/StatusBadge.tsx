@@ -41,6 +41,14 @@ const statusConfig: Record<StatusType, { label: string; className: string }> = {
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+  if (!status) {
+    return (
+      <span className={cn('status-badge', 'bg-gray-100 text-gray-800', className)}>
+        Unknown
+      </span>
+    );
+  }
+
   const config = statusConfig[status as StatusType] || {
     label: status.replace(/_/g, ' '),
     className: 'bg-gray-100 text-gray-800',
