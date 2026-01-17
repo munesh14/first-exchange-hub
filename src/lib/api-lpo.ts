@@ -138,16 +138,18 @@ export async function getLPOs(params?: {
   if (params?.vendor) searchParams.append('vendor', params.vendor);
   if (params?.dateFrom) searchParams.append('dateFrom', params.dateFrom);
   if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
-  
+
   const url = `${API_BASE}/lpos${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
   const response = await fetch(url);
-  return response.json();
+  const result = await response.json();
+  return result.success ? result.data.lpos : [];
 }
 
 // Get LPO by UUID
 export async function getLPO(uuid: string): Promise<{ lpo: LPO; items: LPOItem[]; receipts: LPOReceipt[] }> {
   const response = await fetch(`${API_BASE}/lpos/${uuid}`);
-  return response.json();
+  const result = await response.json();
+  return result.success ? result.data : { lpo: null, items: [], receipts: [] };
 }
 
 // Create new LPO
@@ -279,7 +281,8 @@ export async function getLPOStats(): Promise<{
   TotalValueApproved: number;
 }> {
   const response = await fetch(`${API_BASE}/lpos/stats`);
-  return response.json();
+  const result = await response.json();
+  return result.success ? result.data : {};
 }
 
 // Upload quotation for AI extraction
