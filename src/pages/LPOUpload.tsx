@@ -10,13 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  ArrowLeft, Upload, FileText, Loader2, Sparkles, CheckCircle2, 
+import {
+  ArrowLeft, Upload, FileText, Loader2, Sparkles, CheckCircle2,
   AlertCircle, Edit3, Save, ExternalLink, Home, Plus, Trash2, Building2, Users
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+import { uploadQuotation, updateLPO, getBranches, getDepartments } from '@/lib/api-lpo';
 
 // Simple UUID generator that works in HTTP context
 function generateUUID(): string {
@@ -129,60 +128,42 @@ export default function LPOUpload() {
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
     if (!canUpload) return;
-    
+
     const file = acceptedFiles[0];
     setUploading(true);
     setUploadError(null);
-    
+
     try {
-      // Convert file to base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
-        };
-        reader.onerror = error => reject(error);
-      });
+      // Use the Express API upload function
+      const result = await uploadQuotation(
+        file,
+        parseInt(branchId),
+        departmentId ? parseInt(departmentId) : undefined,
+        1 // Default user - should come from auth context
+      );
 
-      const response = await fetch(`${API_BASE}/lpo-upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file: base64,
-          fileName: file.name,
-          fileType: file.type,
-          branchId: parseInt(branchId),
-          departmentId: departmentId ? parseInt(departmentId) : null,
-          userId: 1, // Default user - should come from auth context
-        }),
-      });
-
-      const result = await response.json();
-      
       if (result.success) {
-        // Parse the created LPO data from the response
+        // Map the Express API response to our LPO format
         const lpoData: ExtractedLPO = {
-          LPOID: result.data?.lpoId || result.lpo?.LPOID || result.LPOID,
-          LPOUUID: result.data?.lpoUUID || result.lpo?.LPOUUID || result.LPOUUID,
-          LPONumber: result.data?.lpoNumber || result.lpo?.LPONumber || result.LPONumber,
-          VendorName: result.data?.extracted?.vendor_name || result.extractedData?.vendor?.name || result.lpo?.VendorName || 'Unknown Vendor',
-          VendorAddress: result.data?.extracted?.vendor_address || result.extractedData?.vendor?.address || result.lpo?.VendorAddress,
-          VendorContact: result.data?.extracted?.vendor_contact_person || result.extractedData?.vendor?.contact_person,
-          VendorPhone: result.data?.extracted?.vendor_phone || result.extractedData?.vendor?.phone,
-          QuotationReference: result.data?.extracted?.quotation_number || result.extractedData?.quotation_number || result.lpo?.QuotationReference,
-          SubTotal: result.data?.summary?.subtotal || result.lpo?.SubTotal || result.data?.extracted?.subtotal || 0,
-          VATAmount: result.data?.summary?.vatAmount || result.lpo?.VATAmount || result.data?.extracted?.vat_amount || 0,
-          TotalAmount: result.data?.summary?.totalAmount || result.lpo?.TotalAmount || result.data?.extracted?.total_amount || 0,
-          ConfidenceScore: result.data?.confidenceScore || result.extractedData?.confidence_score || result.confidenceScore || 0,
-          Items: (result.data?.extracted?.items || result.extractedData?.items || []).map((item: any, idx: number) => ({
+          LPOID: result.lpo?.LPOID,
+          LPOUUID: result.lpo?.LPOUUID,
+          LPONumber: result.lpo?.LPONumber,
+          VendorName: result.extractedData?.vendorName || result.lpo?.VendorName || 'Unknown Vendor',
+          VendorAddress: result.extractedData?.vendorAddress || result.lpo?.VendorAddress,
+          VendorContact: result.extractedData?.vendorEmail,
+          VendorPhone: result.extractedData?.vendorPhone,
+          QuotationReference: result.extractedData?.quotationNumber || result.lpo?.QuotationReference,
+          SubTotal: result.extractedData?.subTotal || result.lpo?.SubTotal || 0,
+          VATAmount: result.extractedData?.vatAmount || result.lpo?.VATAmount || 0,
+          TotalAmount: result.extractedData?.totalAmount || result.lpo?.TotalAmount || 0,
+          ConfidenceScore: result.confidenceScore || 0,
+          Items: (result.extractedData?.lineItems || []).map((item: any) => ({
             id: generateUUID(),
             description: item.description || '',
             quantity: item.quantity || 1,
-            unit: item.unit || 'EA',
-            unitPrice: item.unit_price || 0,
-            totalPrice: item.total_price || (item.quantity * item.unit_price) || 0,
+            unit: item.unitOfMeasure || 'EA',
+            unitPrice: item.unitPrice || 0,
+            totalPrice: item.totalPrice || 0,
           })),
         };
 
@@ -190,11 +171,11 @@ export default function LPOUpload() {
         setEditedLPO({ ...lpoData });
         setShowSuccessModal(true);
       } else {
-        setUploadError(result.error || result.message || 'Failed to process quotation');
+        setUploadError(result.error || 'Failed to process quotation');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading quotation:', error);
-      setUploadError('Network error. Please check your connection and try again.');
+      setUploadError(error.message || 'Network error. Please check your connection and try again.');
     } finally {
       setUploading(false);
     }
@@ -213,14 +194,13 @@ export default function LPOUpload() {
   // Update LPO with edited data
   const handleSaveEdits = async () => {
     if (!editedLPO) return;
-    
+
     setSaving(true);
     try {
-      const response = await fetch(`${API_BASE}/lpo-api/lpo/update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lpoUuid: editedLPO.LPOUUID,
+      const result = await updateLPO(
+        editedLPO.LPOUUID,
+        1, // Default user - should come from auth context
+        {
           vendorName: editedLPO.VendorName,
           vendorAddress: editedLPO.VendorAddress,
           vendorContact: editedLPO.VendorContact,
@@ -228,23 +208,22 @@ export default function LPOUpload() {
           quotationReference: editedLPO.QuotationReference,
           items: editedLPO.Items.map((item, idx) => ({
             lineNumber: idx + 1,
-            itemDescription: item.description,
+            description: item.description,
             quantity: item.quantity,
             unitOfMeasure: item.unit,
             unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
           })),
-          userId: 1,
-        }),
-      });
+        }
+      );
 
-      const result = await response.json();
       if (result.success) {
         setCreatedLPO({ ...editedLPO });
         setIsEditing(false);
       } else {
         alert('Failed to save changes: ' + (result.error || 'Unknown error'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving LPO:', error);
       alert('Failed to save changes. Please try again.');
     } finally {
