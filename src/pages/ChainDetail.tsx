@@ -308,7 +308,12 @@ export default function ChainDetail() {
                 <FileText className="w-5 h-5 text-blue-600" />
                 Quotations ({documents.quotations.length})
               </CardTitle>
-              <Button size="sm" variant="outline" className="gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => navigate(`/quotations/upload?chainId=${chain.chainUuid}`)}
+              >
                 <Plus className="w-4 h-4" />
                 Add
               </Button>
@@ -349,7 +354,12 @@ export default function ChainDetail() {
                 <ClipboardList className="w-5 h-5 text-indigo-600" />
                 LPOs ({documents.lpos.length})
               </CardTitle>
-              <Button size="sm" variant="outline" className="gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => navigate(`/lpo/new?chainId=${chain.chainUuid}`)}
+              >
                 <Plus className="w-4 h-4" />
                 Add
               </Button>
@@ -390,7 +400,12 @@ export default function ChainDetail() {
                 <Truck className="w-5 h-5 text-purple-600" />
                 Delivery Orders ({documents.deliveryOrders.length})
               </CardTitle>
-              <Button size="sm" variant="outline" className="gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => navigate(`/delivery-orders/new?chainId=${chain.chainUuid}`)}
+              >
                 <Plus className="w-4 h-4" />
                 Add
               </Button>
@@ -431,7 +446,12 @@ export default function ChainDetail() {
                 <Receipt className="w-5 h-5 text-teal-600" />
                 Invoices ({documents.invoices.length})
               </CardTitle>
-              <Button size="sm" variant="outline" className="gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => navigate(`/upload?chainId=${chain.chainUuid}`)}
+              >
                 <Plus className="w-4 h-4" />
                 Add
               </Button>
@@ -471,7 +491,12 @@ export default function ChainDetail() {
               <CreditCard className="w-5 h-5 text-green-600" />
               Payments ({documents.payments.length})
             </CardTitle>
-            <Button size="sm" variant="outline" className="gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => navigate(`/payments/new?chainId=${chain.chainUuid}`)}
+            >
               <Plus className="w-4 h-4" />
               Add
             </Button>

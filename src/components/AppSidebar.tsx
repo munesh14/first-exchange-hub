@@ -3,23 +3,12 @@ import { useUser } from '@/contexts/UserContext';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
-  Upload,
-  FileText,
-  Clock,
   BarChart3,
   Monitor,
   User,
   ChevronDown,
   LogOut,
   Building2,
-  ClipboardList,
-  CheckCircle,
-  FileSearch,
-  Truck,
-  Receipt,
-  CreditCard,
-  Wallet,
-  Package,
   Link2,
   Plus,
 } from 'lucide-react';
@@ -36,36 +25,9 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
 ];
 
-const chainItems = [
+const procurementItems = [
   { path: '/chains', label: 'All Chains', icon: Link2 },
   { path: '/chains/new', label: 'New Chain', icon: Plus },
-];
-
-const documentItems = [
-  { path: '/upload', label: 'Upload Invoice', icon: Upload },
-  { path: '/invoices', label: 'All Invoices', icon: FileText },
-  { path: '/pending', label: 'Pending Review', icon: Clock },
-];
-
-const procurementItems = [
-  { path: '/quotations', label: 'Quotations', icon: FileSearch },
-  { path: '/lpo', label: 'Purchase Orders', icon: ClipboardList },
-  { path: '/lpo/pending', label: 'LPO Approvals', icon: CheckCircle },
-  { path: '/delivery-orders', label: 'Delivery Orders', icon: Truck },
-];
-
-const paymentItems = [
-  { path: '/payments/new', label: 'Record Payment', icon: Wallet },
-  { path: '/payments/pdc', label: 'PDC Tracker', icon: CreditCard },
-];
-
-const assetItems = [
-  { path: '/assets/pending', label: 'Pending Assets', icon: Package },
-];
-
-const restrictedItems = [
-  { path: '/reports', label: 'Reports', icon: BarChart3 },
-  { path: '/assets', label: 'Asset Register', icon: Monitor },
 ];
 
 export function AppSidebar() {
@@ -106,44 +68,6 @@ export function AppSidebar() {
           </NavLink>
         ))}
 
-        {/* Procurement Chains Section */}
-        <div className="pt-4 pb-2">
-          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-            Procurement Chains
-          </p>
-        </div>
-        {chainItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn('nav-item', isActive && 'nav-item-active')
-            }
-          >
-            <item.icon className="w-5 h-5" />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-
-        {/* Documents Section */}
-        <div className="pt-4 pb-2">
-          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-            Documents
-          </p>
-        </div>
-        {documentItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn('nav-item', isActive && 'nav-item-active')
-            }
-          >
-            <item.icon className="w-5 h-5" />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-
         {/* Procurement Section */}
         <div className="pt-4 pb-2">
           <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
@@ -163,74 +87,43 @@ export function AppSidebar() {
           </NavLink>
         ))}
 
-        {/* Payments Section */}
-        <div className="pt-4 pb-2">
-          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-            Payments
-          </p>
-        </div>
-        {paymentItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn('nav-item', isActive && 'nav-item-active')
-            }
-          >
-            <item.icon className="w-5 h-5" />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-
-        {/* Assets Section */}
-        <div className="pt-4 pb-2">
-          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-            Assets
-          </p>
-        </div>
-        {assetItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn('nav-item', isActive && 'nav-item-active')
-            }
-          >
-            <item.icon className="w-5 h-5" />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-
-        {/* Administration */}
-        {(canAccessReports || canAccessAssets) && (
+        {/* Asset Register */}
+        {canAccessAssets && (
           <>
             <div className="pt-4 pb-2">
               <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-                Administration
+                Assets
               </p>
             </div>
-            {canAccessReports && (
-              <NavLink
-                to="/reports"
-                className={({ isActive }) =>
-                  cn('nav-item', isActive && 'nav-item-active')
-                }
-              >
-                <BarChart3 className="w-5 h-5" />
-                <span>Reports</span>
-              </NavLink>
-            )}
-            {canAccessAssets && (
-              <NavLink
-                to="/assets"
-                className={({ isActive }) =>
-                  cn('nav-item', isActive && 'nav-item-active')
-                }
-              >
-                <Monitor className="w-5 h-5" />
-                <span>Asset Register</span>
-              </NavLink>
-            )}
+            <NavLink
+              to="/assets"
+              className={({ isActive }) =>
+                cn('nav-item', isActive && 'nav-item-active')
+              }
+            >
+              <Monitor className="w-5 h-5" />
+              <span>Asset Register</span>
+            </NavLink>
+          </>
+        )}
+
+        {/* Reports */}
+        {canAccessReports && (
+          <>
+            <div className="pt-4 pb-2">
+              <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+                Reports
+              </p>
+            </div>
+            <NavLink
+              to="/reports"
+              className={({ isActive }) =>
+                cn('nav-item', isActive && 'nav-item-active')
+              }
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span>Reports</span>
+            </NavLink>
           </>
         )}
       </nav>
