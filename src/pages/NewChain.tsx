@@ -15,6 +15,12 @@ import {
   FileText,
   Info,
   Loader2,
+  ClipboardList,
+  Truck,
+  Receipt,
+  CreditCard,
+  ArrowRight,
+  CheckCircle,
 } from 'lucide-react';
 import {
   Select,
@@ -331,47 +337,115 @@ export default function NewChain() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-100">
-                <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="space-y-3">
-                    <div>
-                      <h3 className="font-semibold text-slate-900 mb-2">Document Workflow</h3>
-                      <p className="text-slate-700 leading-relaxed">
-                        You can add the following documents to this chain later as needed:
-                      </p>
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center gap-3">
+                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Procurement Workflow</h3>
+                    <p className="text-sm text-slate-600">
+                      All document sections will be available for you to add as your workflow progresses
+                    </p>
+                  </div>
+                </div>
+
+                {/* Workflow Diagram */}
+                <div className="bg-gradient-to-br from-slate-50 to-blue-50 p-6 rounded-lg border border-slate-200">
+                  <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
+                    {/* Quotation */}
+                    <div className="flex flex-col items-center gap-2 min-w-[100px]">
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-100 to-blue-50 border-2 border-blue-300 border-dashed flex items-center justify-center">
+                          <FileText className="w-6 h-6 text-blue-600" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-semibold text-slate-700">Quotation</p>
+                        <p className="text-xs text-slate-500 italic">optional</p>
+                      </div>
                     </div>
 
-                    <ul className="space-y-1.5 text-sm text-slate-600">
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                        Quotation (optional)
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                        LPO - Local Purchase Order (optional)
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                        Delivery Order (optional)
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                        Proforma Invoice (optional)
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
-                        <span className="font-medium text-emerald-700">Invoice (always included)</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
-                        <span className="font-medium text-emerald-700">Payment (always included)</span>
-                      </li>
-                    </ul>
+                    {/* Arrow */}
+                    <ArrowRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
 
-                    <p className="text-sm text-slate-600 pt-2 border-t border-blue-200">
-                      All document sections will be available in the chain detail page for you to add as your workflow progresses.
-                    </p>
+                    {/* LPO */}
+                    <div className="flex flex-col items-center gap-2 min-w-[100px]">
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 border-2 border-indigo-300 border-dashed flex items-center justify-center">
+                          <ClipboardList className="w-6 h-6 text-indigo-600" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-semibold text-slate-700">LPO</p>
+                        <p className="text-xs text-slate-500 italic">optional</p>
+                      </div>
+                    </div>
+
+                    {/* Arrow */}
+                    <ArrowRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
+
+                    {/* Delivery Order */}
+                    <div className="flex flex-col items-center gap-2 min-w-[100px]">
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-100 to-purple-50 border-2 border-purple-300 border-dashed flex items-center justify-center">
+                          <Truck className="w-6 h-6 text-purple-600" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-semibold text-slate-700">Delivery</p>
+                        <p className="text-xs text-slate-500 italic">optional</p>
+                      </div>
+                    </div>
+
+                    {/* Arrow */}
+                    <ArrowRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
+
+                    {/* Invoice */}
+                    <div className="flex flex-col items-center gap-2 min-w-[100px]">
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 border-2 border-teal-400 shadow-lg flex items-center justify-center">
+                          <Receipt className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow">
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-bold text-teal-700">Invoice</p>
+                        <p className="text-xs text-teal-600 font-semibold">required</p>
+                      </div>
+                    </div>
+
+                    {/* Arrow */}
+                    <ArrowRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
+
+                    {/* Payment */}
+                    <div className="flex flex-col items-center gap-2 min-w-[100px]">
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 border-2 border-emerald-400 shadow-lg flex items-center justify-center">
+                          <CreditCard className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow">
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-bold text-emerald-700">Payment</p>
+                        <p className="text-xs text-emerald-600 font-semibold">required</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="mt-6 pt-4 border-t border-slate-300 flex items-center justify-center gap-6 text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full border-2 border-blue-300 border-dashed bg-blue-50"></div>
+                      <span className="text-slate-600">Optional documents</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 shadow"></div>
+                      <span className="text-slate-600">Required documents</span>
+                    </div>
                   </div>
                 </div>
               </div>
