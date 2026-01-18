@@ -221,8 +221,7 @@ export default function ChainDetail() {
       {/* Documents Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Quotations */}
-        {chain.expectedDocuments.hasQuotation && (
-          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-blue-50 to-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow">
@@ -302,11 +301,9 @@ export default function ChainDetail() {
               )}
             </CardContent>
           </Card>
-        )}
 
         {/* LPOs */}
-        {chain.expectedDocuments.hasLPO && (
-          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-indigo-50 to-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow">
@@ -398,11 +395,9 @@ export default function ChainDetail() {
               )}
             </CardContent>
           </Card>
-        )}
 
         {/* Delivery Orders */}
-        {chain.expectedDocuments.hasDeliveryOrder && (
-          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-purple-50 to-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow">
@@ -493,11 +488,9 @@ export default function ChainDetail() {
               )}
             </CardContent>
           </Card>
-        )}
 
         {/* Invoices */}
-        {chain.expectedDocuments.hasInvoice && (
-          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-teal-50 to-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg shadow">
@@ -598,7 +591,6 @@ export default function ChainDetail() {
               )}
             </CardContent>
           </Card>
-        )}
 
         {/* Payments */}
         <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
