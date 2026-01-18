@@ -103,7 +103,7 @@ export default function LPOList() {
               Refresh
             </Button>
             <Button
-              onClick={() => navigate('/lpo/create')}
+              onClick={() => navigate('/lpo/new')}
               className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200"
             >
               <Plus className="w-4 h-4 mr-2" />

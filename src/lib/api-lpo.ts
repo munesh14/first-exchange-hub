@@ -1,5 +1,7 @@
 // LPO API Client - Add to your existing api.ts or import separately
 
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // Import lookup functions from centralized lookup API
 export * from './api-lookup';
 
@@ -140,14 +142,14 @@ export async function getLPOs(params?: {
   if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
 
   const url = `${API_BASE}/lpos${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url, {}, 5000);
   const result = await response.json();
   return result.success ? result.data.lpos : [];
 }
 
 // Get LPO by UUID
 export async function getLPO(uuid: string): Promise<{ lpo: LPO; items: LPOItem[]; receipts: LPOReceipt[] }> {
-  const response = await fetch(`${API_BASE}/lpos/${uuid}`);
+  const response = await fetchWithTimeout(`${API_BASE}/lpos/${uuid}`, {}, 5000);
   const result = await response.json();
   return result.success ? result.data : { lpo: null, items: [], receipts: [] };
 }
@@ -280,7 +282,7 @@ export async function getLPOStats(): Promise<{
   TotalValuePending: number;
   TotalValueApproved: number;
 }> {
-  const response = await fetch(`${API_BASE}/lpos/stats`);
+  const response = await fetchWithTimeout(`${API_BASE}/lpos/stats`, {}, 5000);
   const result = await response.json();
   return result.success ? result.data : {};
 }

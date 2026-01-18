@@ -15,7 +15,7 @@ import {
   AlertCircle, Edit3, Save, ExternalLink, Home, Plus, Trash2, Building2, Users
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import { uploadQuotation, updateLPO, getBranches, getDepartments } from '@/lib/api-lpo';
+import { uploadQuotation, updateLPO, createLPO, getBranches, getDepartments } from '@/lib/api-lpo';
 
 // Simple UUID generator that works in HTTP context
 function generateUUID(): string {
@@ -94,14 +94,17 @@ export default function LPOUpload() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  
+
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdLPO, setCreatedLPO] = useState<ExtractedLPO | null>(null);
-  
+
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
   const [editedLPO, setEditedLPO] = useState<ExtractedLPO | null>(null);
+
+  // Manual entry mode
+  const [isManualEntry, setIsManualEntry] = useState(false);
 
   // Branch/Department selection - NO defaults, user must select
   const [branchId, setBranchId] = useState<string>('');
@@ -143,6 +146,12 @@ export default function LPOUpload() {
       );
 
       if (result.success) {
+        // Debug logging
+        console.log('[LPOUpload] API Response:', result);
+        console.log('[LPOUpload] extractedData:', result.extractedData);
+        console.log('[LPOUpload] lineItems:', result.extractedData?.lineItems);
+        console.log('[LPOUpload] lineItems length:', result.extractedData?.lineItems?.length);
+
         // Map the Express API response to our LPO format
         const lpoData: ExtractedLPO = {
           LPOID: result.lpo?.LPOID,
@@ -156,7 +165,7 @@ export default function LPOUpload() {
           SubTotal: result.extractedData?.subTotal || result.lpo?.SubTotal || 0,
           VATAmount: result.extractedData?.vatAmount || result.lpo?.VATAmount || 0,
           TotalAmount: result.extractedData?.totalAmount || result.lpo?.TotalAmount || 0,
-          ConfidenceScore: result.confidenceScore || 0,
+          ConfidenceScore: Math.round((result.confidenceScore || 0) * 100), // Convert 0.95 to 95
           Items: (result.extractedData?.lineItems || []).map((item: any) => ({
             id: generateUUID(),
             description: item.description || '',
@@ -167,9 +176,14 @@ export default function LPOUpload() {
           })),
         };
 
+        console.log('[LPOUpload] Mapped LPO data:', lpoData);
+        console.log('[LPOUpload] Items count:', lpoData.Items.length);
+        console.log('[LPOUpload] Confidence Score:', lpoData.ConfidenceScore);
+
         setCreatedLPO(lpoData);
         setEditedLPO({ ...lpoData });
         setShowSuccessModal(true);
+        console.log('[LPOUpload] Success modal should now be visible');
       } else {
         setUploadError(result.error || 'Failed to process quotation');
       }
@@ -191,21 +205,44 @@ export default function LPOUpload() {
     disabled: !canUpload,
   });
 
-  // Update LPO with edited data
+  // Save LPO (create for manual entry, update for AI extraction)
   const handleSaveEdits = async () => {
     if (!editedLPO) return;
 
+    // Validate that items have valid quantities and prices
+    const hasInvalidItems = editedLPO.Items.some(
+      item => item.quantity <= 0 || item.unitPrice < 0 || !item.description.trim()
+    );
+
+    if (hasInvalidItems) {
+      alert('Please ensure all items have valid quantities, prices, and descriptions.');
+      return;
+    }
+
+    // Validate vendor name
+    if (!editedLPO.VendorName.trim()) {
+      alert('Please enter vendor name.');
+      return;
+    }
+
     setSaving(true);
     try {
-      const result = await updateLPO(
-        editedLPO.LPOUUID,
-        1, // Default user - should come from auth context
-        {
+      // Calculate totals from edited items
+      const totals = calculateTotals(editedLPO);
+
+      if (isManualEntry) {
+        // CREATE new LPO for manual entry
+        const result = await createLPO({
+          branchId: parseInt(branchId),
+          departmentId: departmentId ? parseInt(departmentId) : undefined,
           vendorName: editedLPO.VendorName,
           vendorAddress: editedLPO.VendorAddress,
           vendorContact: editedLPO.VendorContact,
           vendorPhone: editedLPO.VendorPhone,
           quotationReference: editedLPO.QuotationReference,
+          currencyCode: 'OMR',
+          vatPercent: 5,
+          discountPercent: 0,
           items: editedLPO.Items.map((item, idx) => ({
             lineNumber: idx + 1,
             description: item.description,
@@ -214,14 +251,54 @@ export default function LPOUpload() {
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
           })),
-        }
-      );
+          userId: 1, // Default user - should come from auth context
+        });
 
-      if (result.success) {
-        setCreatedLPO({ ...editedLPO });
-        setIsEditing(false);
+        if (result.success && result.LPOUUID) {
+          // Navigate to the newly created LPO
+          navigate(`/lpo/${result.LPOUUID}`);
+        } else {
+          alert('Failed to create LPO: ' + (result.error || 'Unknown error'));
+        }
       } else {
-        alert('Failed to save changes: ' + (result.error || 'Unknown error'));
+        // UPDATE existing LPO from AI extraction
+        const result = await updateLPO(
+          editedLPO.LPOUUID,
+          1, // Default user - should come from auth context
+          {
+            vendorName: editedLPO.VendorName,
+            vendorAddress: editedLPO.VendorAddress,
+            vendorContact: editedLPO.VendorContact,
+            vendorPhone: editedLPO.VendorPhone,
+            quotationReference: editedLPO.QuotationReference,
+            subTotal: totals.subtotal,
+            vatAmount: totals.vatAmount,
+            totalAmount: totals.total,
+            items: editedLPO.Items.map((item, idx) => ({
+              lineNumber: idx + 1,
+              description: item.description,
+              quantity: item.quantity,
+              unitOfMeasure: item.unit,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+            })),
+          }
+        );
+
+        if (result.success) {
+          // Update createdLPO with the edited values AND calculated totals
+          const updatedLPO = {
+            ...editedLPO,
+            SubTotal: totals.subtotal,
+            VATAmount: totals.vatAmount,
+            TotalAmount: totals.total,
+          };
+          setCreatedLPO(updatedLPO);
+          setEditedLPO(updatedLPO);
+          setIsEditing(false);
+        } else {
+          alert('Failed to save changes: ' + (result.error || 'Unknown error'));
+        }
       }
     } catch (error: any) {
       console.error('Error saving LPO:', error);
@@ -241,7 +318,12 @@ export default function LPOUpload() {
           const updated = { ...item, [field]: value };
           // Recalculate total if quantity or price changed
           if (field === 'quantity' || field === 'unitPrice') {
-            updated.totalPrice = updated.quantity * updated.unitPrice;
+            // Ensure valid numbers (not NaN)
+            const qty = isNaN(updated.quantity) ? 0 : updated.quantity;
+            const price = isNaN(updated.unitPrice) ? 0 : updated.unitPrice;
+            updated.quantity = qty;
+            updated.unitPrice = price;
+            updated.totalPrice = qty * price;
           }
           return updated;
         }
@@ -283,6 +365,44 @@ export default function LPOUpload() {
     return { subtotal, vatAmount, total };
   };
 
+  // Manual entry handler
+  const handleManualEntry = () => {
+    if (!isSelectionValid) {
+      alert('Please select branch and department before creating LPO manually.');
+      return;
+    }
+
+    // Create empty LPO with defaults
+    const emptyLPO: ExtractedLPO = {
+      LPOID: 0,
+      LPOUUID: '',
+      LPONumber: 'Draft',
+      VendorName: '',
+      VendorAddress: '',
+      VendorContact: '',
+      VendorPhone: '',
+      QuotationReference: '',
+      SubTotal: 0,
+      VATAmount: 0,
+      TotalAmount: 0,
+      ConfidenceScore: 0,
+      Items: [{
+        id: generateUUID(),
+        description: '',
+        quantity: 1,
+        unit: 'EA',
+        unitPrice: 0,
+        totalPrice: 0,
+      }],
+    };
+
+    setCreatedLPO(emptyLPO);
+    setEditedLPO({ ...emptyLPO });
+    setIsManualEntry(true);
+    setIsEditing(true); // Start in edit mode
+    setShowSuccessModal(true);
+  };
+
   // Navigation handlers
   const handleViewLPO = () => {
     if (createdLPO) {
@@ -299,6 +419,7 @@ export default function LPOUpload() {
     setCreatedLPO(null);
     setEditedLPO(null);
     setIsEditing(false);
+    setIsManualEntry(false);
     // Keep the branch/department selection for next upload
   };
 
@@ -307,21 +428,23 @@ export default function LPOUpload() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/lpo')} 
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/lpo')}
             className="mb-4 text-slate-600 hover:text-slate-900"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to LPO List
           </Button>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-100 rounded-xl">
-              <Sparkles className="w-8 h-8 text-indigo-600" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">AI Quotation Upload</h1>
-              <p className="text-slate-500">Upload a vendor quotation and let AI extract the details</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-100 rounded-xl">
+                <Sparkles className="w-8 h-8 text-indigo-600" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900">Create Local Purchase Order</h1>
+                <p className="text-slate-500">Upload quotation for AI extraction or enter details manually</p>
+              </div>
             </div>
           </div>
         </div>
@@ -516,6 +639,24 @@ export default function LPOUpload() {
                 </div>
               )}
             </div>
+
+            {/* Manual Entry Option */}
+            {isSelectionValid && (
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <div className="text-center">
+                  <p className="text-sm text-slate-600 mb-3">Don't have a quotation file?</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleManualEntry}
+                    className="gap-2"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    Skip Upload / Enter Manually
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -525,13 +666,22 @@ export default function LPOUpload() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-full">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              <div className={`p-2 rounded-full ${isManualEntry ? 'bg-blue-100' : 'bg-green-100'}`}>
+                {isManualEntry ? (
+                  <Edit3 className="w-6 h-6 text-blue-600" />
+                ) : (
+                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+                )}
               </div>
               <div>
-                <DialogTitle className="text-xl">LPO Created Successfully</DialogTitle>
+                <DialogTitle className="text-xl">
+                  {isManualEntry ? 'Create LPO Manually' : 'LPO Created Successfully'}
+                </DialogTitle>
                 <DialogDescription>
-                  {createdLPO?.LPONumber} has been created in DRAFT status. Review and edit if needed.
+                  {isManualEntry
+                    ? 'Enter vendor and item details below, then click "Create LPO" to save.'
+                    : `${createdLPO?.LPONumber} has been created in DRAFT status. Review and edit if needed.`
+                  }
                 </DialogDescription>
               </div>
             </div>
@@ -539,31 +689,35 @@ export default function LPOUpload() {
 
           {createdLPO && (
             <div className="space-y-4 mt-4">
-              {/* Confidence Score */}
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-500" />
-                  <span className="text-sm font-medium">AI Confidence Score</span>
+              {/* Confidence Score - Only show for AI extraction */}
+              {!isManualEntry && (
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-500" />
+                    <span className="text-sm font-medium">AI Confidence Score</span>
+                  </div>
+                  <Badge
+                    variant={createdLPO.ConfidenceScore >= 80 ? "default" : createdLPO.ConfidenceScore >= 50 ? "secondary" : "destructive"}
+                    className={createdLPO.ConfidenceScore >= 80 ? "bg-green-500" : ""}
+                  >
+                    {createdLPO.ConfidenceScore}%
+                  </Badge>
                 </div>
-                <Badge 
-                  variant={createdLPO.ConfidenceScore >= 80 ? "default" : createdLPO.ConfidenceScore >= 50 ? "secondary" : "destructive"}
-                  className={createdLPO.ConfidenceScore >= 80 ? "bg-green-500" : ""}
-                >
-                  {createdLPO.ConfidenceScore}%
-                </Badge>
-              </div>
+              )}
 
-              {/* Edit Toggle */}
-              <div className="flex justify-end">
-                <Button 
-                  variant={isEditing ? "default" : "outline"} 
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                >
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  {isEditing ? 'Editing Mode' : 'Edit Details'}
-                </Button>
-              </div>
+              {/* Edit Toggle - Hide for manual entry (already in edit mode) */}
+              {!isManualEntry && (
+                <div className="flex justify-end">
+                  <Button
+                    variant={isEditing ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setIsEditing(!isEditing)}
+                  >
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    {isEditing ? 'Editing Mode' : 'Edit Details'}
+                  </Button>
+                </div>
+              )}
 
               {/* Vendor Details */}
               <Card>
@@ -787,12 +941,12 @@ export default function LPOUpload() {
                   {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
+                      {isManualEntry ? 'Creating...' : 'Saving...'}
                     </>
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      Save Changes
+                      {isManualEntry ? 'Create LPO' : 'Save Changes'}
                     </>
                   )}
                 </Button>

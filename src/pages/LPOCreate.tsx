@@ -128,36 +128,50 @@ export default function LPOCreate() {
       );
       
       if (result.success && result.extractedData) {
-        setExtractedData(result.extractedData);
-        
+        console.log('[LPOCreate] Extraction result:', result);
+        console.log('[LPOCreate] extractedData:', result.extractedData);
+
+        // Store extractedData with normalized structure for display
+        const normalizedData = {
+          ...result.extractedData,
+          items: result.extractedData.lineItems || result.extractedData.items || [],
+          confidence_score: result.confidenceScore || result.extractedData.confidence_score || 0
+        };
+        setExtractedData(normalizedData);
+
         // Pre-fill form with extracted data
         const data = result.extractedData;
         setFormData(prev => ({
           ...prev,
-          vendorName: data.vendor?.name || prev.vendorName,
-          vendorAddress: data.vendor?.address || prev.vendorAddress,
-          vendorContact: data.vendor?.contact_person || prev.vendorContact,
-          vendorPhone: data.vendor?.phone || prev.vendorPhone,
-          quotationReference: data.quotation_number || prev.quotationReference,
+          // Support both old format (vendor.name) and new format (vendorName)
+          vendorName: data.vendorName || data.vendor?.name || prev.vendorName,
+          vendorAddress: data.vendorAddress || data.vendor?.address || prev.vendorAddress,
+          vendorContact: data.vendorEmail || data.vendor?.contact_person || prev.vendorContact,
+          vendorPhone: data.vendorPhone || data.vendor?.phone || prev.vendorPhone,
+          quotationReference: data.quotationNumber || data.quotation_number || prev.quotationReference,
           currencyCode: data.currency || prev.currencyCode,
-          vatPercent: data.vat_percent || prev.vatPercent,
-          paymentTerms: data.payment_terms || prev.paymentTerms,
+          vatPercent: data.vatRate || data.vat_percent || prev.vatPercent,
+          paymentTerms: data.paymentTerms || data.payment_terms || prev.paymentTerms,
         }));
-        
-        // Pre-fill items
-        if (data.items && data.items.length > 0) {
-          setItems(data.items.map((item: any, index: number) => ({
+
+        // Pre-fill items - support both lineItems and items
+        const extractedItems = data.lineItems || data.items || [];
+        if (extractedItems.length > 0) {
+          console.log('[LPOCreate] Mapping', extractedItems.length, 'items');
+          setItems(extractedItems.map((item: any, index: number) => ({
             id: Math.random().toString(36).substring(2, 15),
             itemDescription: item.description || '',
             categoryId: null,
             quantity: item.quantity || 1,
-            unitOfMeasure: item.unit || 'EA',
-            unitPrice: item.unit_price || 0,
+            unitOfMeasure: item.unitOfMeasure || item.unit || 'EA',
+            unitPrice: item.unitPrice || item.unit_price || 0,
             notes: item.specifications || '',
           })));
         }
-        
-        alert(`Quotation extracted successfully! Confidence: ${data.confidence_score || 0}%`);
+
+        const itemCount = extractedItems.length;
+        const confidence = result.confidenceScore || data.confidence_score || 0;
+        alert(`Quotation extracted successfully!\nItems: ${itemCount}\nConfidence: ${Math.round(confidence * 100)}%`);
       }
     } catch (error) {
       console.error('Error uploading quotation:', error);
@@ -467,8 +481,8 @@ export default function LPOCreate() {
                 {extractedData && (
                   <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
                     <p className="text-sm text-green-700">
-                      ✓ Extracted {extractedData.items?.length || 0} items from quotation 
-                      (Confidence: {extractedData.confidence_score || 0}%)
+                      ✓ Extracted {(extractedData.items || extractedData.lineItems || []).length} items from quotation
+                      (Confidence: {Math.round((extractedData.confidence_score || 0) * 100)}%)
                     </p>
                   </div>
                 )}
