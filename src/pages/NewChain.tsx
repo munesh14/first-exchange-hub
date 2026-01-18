@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft,
@@ -38,13 +37,6 @@ export default function NewChain() {
   const [vendorId, setVendorId] = useState<number | null>(null);
   const [vendorSearch, setVendorSearch] = useState('');
   const [estimatedAmount, setEstimatedAmount] = useState('');
-
-  // Document checkboxes (defaults as per typical procurement flow)
-  const [hasQuotation, setHasQuotation] = useState(true);
-  const [hasLPO, setHasLPO] = useState(true);
-  const [hasDeliveryOrder, setHasDeliveryOrder] = useState(true);
-  const [hasProforma, setHasProforma] = useState(false);
-  const [hasInvoice, setHasInvoice] = useState(true);
 
   // Lookup data
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -148,11 +140,11 @@ export default function NewChain() {
         departmentId: departmentId!,
         branchId: branchId,
         vendorId: vendorId || undefined,
-        hasQuotation,
-        hasLPO,
-        hasDeliveryOrder,
-        hasProforma,
-        hasInvoice,
+        hasQuotation: true,
+        hasLPO: true,
+        hasDeliveryOrder: true,
+        hasProforma: true,
+        hasInvoice: true,
         estimatedAmount: estimatedAmount ? parseFloat(estimatedAmount) : undefined,
         createdBy: currentUser.UserID,
       };
@@ -338,106 +330,50 @@ export default function NewChain() {
                 WORKFLOW DOCUMENTS
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 space-y-4">
-              <p className="text-slate-600 mb-4">
-                Select which documents are needed for this procurement:
-              </p>
+            <CardContent className="pt-6">
+              <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-100">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 mb-2">Document Workflow</h3>
+                      <p className="text-slate-700 leading-relaxed">
+                        You can add the following documents to this chain later as needed:
+                      </p>
+                    </div>
 
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                  <Checkbox
-                    id="quotation"
-                    checked={hasQuotation}
-                    onCheckedChange={(checked) => setHasQuotation(checked === true)}
-                    className="mt-1 accent-blue-500"
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="quotation" className="text-slate-900 font-semibold cursor-pointer">
-                      Quotation
-                    </Label>
-                    <p className="text-sm text-slate-600">Upload vendor quotation</p>
+                    <ul className="space-y-1.5 text-sm text-slate-600">
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                        Quotation (optional)
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                        LPO - Local Purchase Order (optional)
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                        Delivery Order (optional)
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                        Proforma Invoice (optional)
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
+                        <span className="font-medium text-emerald-700">Invoice (always included)</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
+                        <span className="font-medium text-emerald-700">Payment (always included)</span>
+                      </li>
+                    </ul>
+
+                    <p className="text-sm text-slate-600 pt-2 border-t border-blue-200">
+                      All document sections will be available in the chain detail page for you to add as your workflow progresses.
+                    </p>
                   </div>
                 </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                  <Checkbox
-                    id="lpo"
-                    checked={hasLPO}
-                    onCheckedChange={(checked) => setHasLPO(checked === true)}
-                    className="mt-1 accent-blue-500"
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="lpo" className="text-slate-900 font-semibold cursor-pointer">
-                      LPO
-                    </Label>
-                    <p className="text-sm text-slate-600">Local Purchase Order for approval</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                  <Checkbox
-                    id="delivery"
-                    checked={hasDeliveryOrder}
-                    onCheckedChange={(checked) => setHasDeliveryOrder(checked === true)}
-                    className="mt-1 accent-blue-500"
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="delivery" className="text-slate-900 font-semibold cursor-pointer">
-                      Delivery Order
-                    </Label>
-                    <p className="text-sm text-slate-600">Track goods receipt</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                  <Checkbox
-                    id="proforma"
-                    checked={hasProforma}
-                    onCheckedChange={(checked) => setHasProforma(checked === true)}
-                    className="mt-1 accent-blue-500"
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="proforma" className="text-slate-900 font-semibold cursor-pointer">
-                      Proforma Invoice
-                    </Label>
-                    <p className="text-sm text-slate-600">Optional - before delivery</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                  <Checkbox
-                    id="invoice"
-                    checked={hasInvoice}
-                    onCheckedChange={(checked) => setHasInvoice(checked === true)}
-                    className="mt-1 accent-blue-500"
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="invoice" className="text-slate-900 font-semibold cursor-pointer">
-                      Invoice
-                    </Label>
-                    <p className="text-sm text-slate-600">Vendor invoice for payment</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                  <Checkbox
-                    id="payment"
-                    checked={true}
-                    disabled
-                    className="mt-1 accent-emerald-500"
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="payment" className="text-slate-900 font-semibold">
-                      Payment
-                    </Label>
-                    <p className="text-sm text-slate-600">Payment tracking (always included)</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 mt-4 text-sm text-slate-500 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600" />
-                <p>You can change this later in the chain detail page</p>
               </div>
             </CardContent>
           </Card>
