@@ -15,6 +15,7 @@ import QuotationList from "./pages/QuotationList";
 import InvoiceList from "./pages/InvoiceList";
 
 // Lazy load less frequently used pages
+const NewChain = lazy(() => import("./pages/NewChain"));
 const ChainDetail = lazy(() => import("./pages/ChainDetail"));
 const UploadInvoice = lazy(() => import("./pages/UploadInvoice"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
@@ -64,6 +65,7 @@ const App = () => (
 
                 {/* Procurement Chains */}
                 <Route path="/chains" element={<ChainList />} />
+                <Route path="/chains/new" element={<NewChain />} />
                 <Route path="/chains/:uuid" element={<ChainDetail />} />
 
                 {/* Invoices */}

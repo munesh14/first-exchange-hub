@@ -374,10 +374,30 @@ export interface CreateChainParams {
 }
 
 export async function createChain(params: CreateChainParams): Promise<{ success: boolean; data: { chainId: number; chainUuid: string; chainNumber: string } }> {
+  // Transform camelCase frontend params to PascalCase backend params
+  const backendParams = {
+    Title: params.title,
+    Description: params.description,
+    VendorID: params.vendorId,
+    VendorName: params.vendorName,
+    DepartmentID: params.departmentId,
+    BranchID: params.branchId,
+    IsDirectPurchase: params.isDirectPurchase,
+    Notes: params.notes,
+    CreatedBy: params.createdBy,
+    // Note: hasQuotation, hasLPO, etc. are stored in ExpectedDocuments table via backend logic
+    HasQuotation: params.hasQuotation,
+    HasLPO: params.hasLPO,
+    HasDeliveryOrder: params.hasDeliveryOrder,
+    HasProforma: params.hasProforma,
+    HasInvoice: params.hasInvoice,
+    EstimatedAmount: params.estimatedAmount,
+  };
+
   const response = await fetch(`${API_BASE}/chains`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    body: JSON.stringify(backendParams),
   });
   if (!response.ok) {
     throw new Error(`Failed to create chain: ${response.statusText}`);
