@@ -38,7 +38,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const API_BASE = 'http://172.16.35.76:5679/webhook';
+// Auto-detect API base URL (same pattern as other API files)
+const API_BASE = (() => {
+  const hostname = window.location.hostname;
+  const apiHost = hostname === 'localhost' ? 'localhost' : hostname;
+  return `http://${apiHost}:3010/api`;
+})();
 
 const ACCEPTED_FILE_TYPES = {
   'application/pdf': ['.pdf'],
@@ -159,22 +164,40 @@ export default function UploadInvoice() {
         reader.onerror = error => reject(error);
       });
 
-      // Upload invoice
-      const uploadResponse = await fetch(`${API_BASE}/invoice-upload`, {
+      // Extract invoice data using AI
+      const extractResponse = await fetch(`${API_BASE}/extract/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          file: base64,
+          image: base64,
+        }),
+      });
+
+      const extractResult = await extractResponse.json();
+
+      if (!extractResult.success) {
+        throw new Error(extractResult.error || 'Failed to extract invoice data');
+      }
+
+      // Create invoice in database with extracted data
+      const createResponse = await fetch(`${API_BASE}/invoices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chainId: 1, // Default chain
+          invoiceNumber: extractResult.data.invoiceNumber || 'AUTO',
+          invoiceDate: extractResult.data.invoiceDate || new Date().toISOString().split('T')[0],
+          vendorName: extractResult.data.vendorName || 'Unknown Vendor',
+          departmentId: parseInt(departmentId),
+          totalAmount: extractResult.data.totalAmount || 0,
+          uploadedBy: currentUser?.UserID || 1,
           fileName: file.name,
           fileType: file.type,
-          departmentId: parseInt(departmentId),
-          userId: currentUser?.UserID || 1,
-          categoryId: parseInt(categoryId),
           notes: notes,
         }),
       });
 
-      const uploadResult = await uploadResponse.json();
+      const uploadResult = await createResponse.json();
 
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || 'Failed to upload invoice');
@@ -206,7 +229,7 @@ export default function UploadInvoice() {
       }
 
       // Fetch full invoice details
-      const detailResponse = await fetch(`${API_BASE}/invoice-api/get-invoice?uuid=${invoiceUUID}`);
+      const detailResponse = await fetch(`${API_BASE}/invoices/${invoiceUUID}`);
       const detailResult = await detailResponse.json();
 
       if (detailResult.success && detailResult.invoice) {
@@ -347,11 +370,10 @@ export default function UploadInvoice() {
     try {
       const totals = calculateTotals(editedInvoice);
       
-      const response = await fetch(`${API_BASE}/invoice-api/invoice/update`, {
-        method: 'POST',
+      const response = await fetch(`${API_BASE}/invoices/${editedInvoice.InvoiceID}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          invoiceUuid: editedInvoice.InvoiceUUID,
           userId: currentUser?.UserID || 1,
           updates: {
             VendorName: editedInvoice.VendorName,
@@ -436,40 +458,44 @@ export default function UploadInvoice() {
   };
 
   return (
-    <div className="animate-fade-in max-w-3xl mx-auto">
+    <div className="animate-fade-in max-w-3xl mx-auto min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <PageHeader
         title="Upload Invoice"
         description="Upload an invoice document for AI-powered data extraction"
         breadcrumbs={[{ label: 'Upload Invoice' }]}
       />
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* File Upload Area */}
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Invoice Document</h2>
+        <div className="bg-white rounded-xl border-0 shadow-lg p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <div className="h-1 w-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+            Invoice Document
+          </h2>
 
           {!file ? (
             <div
               {...getRootProps()}
               className={cn(
-                'dropzone',
-                isDragActive && 'dropzone-active',
-                'hover:border-accent hover:bg-accent/5',
+                'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all',
+                isDragActive
+                  ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50'
+                  : 'border-slate-300 hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50 hover:to-white',
                 uploading && 'opacity-50 cursor-not-allowed'
               )}
             >
               <input {...getInputProps()} />
               <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-muted-foreground" />
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Upload className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <p className="text-lg font-medium text-foreground">
+                  <p className="text-lg font-semibold text-slate-900">
                     {isDragActive
                       ? 'Drop your file here...'
                       : 'Drag & drop your invoice'}
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-slate-600 mt-1">
                     or click to browse • PDF, JPG, PNG, HEIC, WebP (max 10MB)
                   </p>
                 </div>
@@ -525,8 +551,11 @@ export default function UploadInvoice() {
         </div>
 
         {/* Invoice Details */}
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Invoice Details</h2>
+        <div className="bg-white rounded-xl border-0 shadow-lg p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <div className="h-1 w-6 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full"></div>
+            Invoice Details
+          </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -594,7 +623,7 @@ export default function UploadInvoice() {
           <Button
             type="submit"
             disabled={!file || !departmentId || !categoryId || uploading}
-            className="gap-2"
+            className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transition-all hover:scale-105"
           >
             {uploading ? (
               <>

@@ -44,10 +44,10 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-r border-slate-700/50 flex flex-col shadow-2xl">
       {/* Logo */}
-      <div className="p-6 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
+      <div className="p-6 border-b border-slate-700/50">
+        <div className="flex items-center gap-3 bg-white/10 rounded-xl p-3 backdrop-blur-sm">
           <img src={feLogo} alt="First Exchange LLC" className="h-10 w-auto" />
         </div>
       </div>
@@ -60,7 +60,12 @@ export function AppSidebar() {
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              cn('nav-item', isActive && 'nav-item-active')
+              cn(
+                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium',
+                isActive
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/50'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
+              )
             }
           >
             <item.icon className="w-5 h-5" />
@@ -69,8 +74,9 @@ export function AppSidebar() {
         ))}
 
         {/* Procurement Section */}
-        <div className="pt-4 pb-2">
-          <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+        <div className="pt-6 pb-2">
+          <p className="px-4 text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+            <div className="h-0.5 w-4 bg-gradient-to-r from-blue-500 to-transparent"></div>
             Procurement
           </p>
         </div>
@@ -79,7 +85,12 @@ export function AppSidebar() {
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              cn('nav-item', isActive && 'nav-item-active')
+              cn(
+                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium',
+                isActive
+                  ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/50'
+                  : 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
+              )
             }
           >
             <item.icon className="w-5 h-5" />
@@ -90,15 +101,21 @@ export function AppSidebar() {
         {/* Asset Register */}
         {canAccessAssets && (
           <>
-            <div className="pt-4 pb-2">
-              <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            <div className="pt-6 pb-2">
+              <p className="px-4 text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+                <div className="h-0.5 w-4 bg-gradient-to-r from-purple-500 to-transparent"></div>
                 Assets
               </p>
             </div>
             <NavLink
               to="/assets"
               className={({ isActive }) =>
-                cn('nav-item', isActive && 'nav-item-active')
+                cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium',
+                  isActive
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/50'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
+                )
               }
             >
               <Monitor className="w-5 h-5" />
@@ -110,15 +127,21 @@ export function AppSidebar() {
         {/* Reports */}
         {canAccessReports && (
           <>
-            <div className="pt-4 pb-2">
-              <p className="px-4 text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+            <div className="pt-6 pb-2">
+              <p className="px-4 text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                <div className="h-0.5 w-4 bg-gradient-to-r from-amber-500 to-transparent"></div>
                 Reports
               </p>
             </div>
             <NavLink
               to="/reports"
               className={({ isActive }) =>
-                cn('nav-item', isActive && 'nav-item-active')
+                cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium',
+                  isActive
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/50'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
+                )
               }
             >
               <BarChart3 className="w-5 h-5" />
@@ -130,36 +153,36 @@ export function AppSidebar() {
 
       {/* User Section */}
       {currentUser && (
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-slate-700/50">
           <DropdownMenu>
             <DropdownMenuTrigger className="w-full">
-              <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer">
-                <div className="w-9 h-9 rounded-full bg-sidebar-primary/20 flex items-center justify-center">
-                  <User className="w-4 h-4 text-sidebar-primary" />
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 transition-all cursor-pointer shadow-lg border border-slate-600/50">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-md">
+                  <User className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  <p className="text-sm font-semibold text-white truncate">
                     {currentUser.FullName}
                   </p>
-                  <p className="text-xs text-sidebar-foreground/60 truncate">
+                  <p className="text-xs text-slate-400 truncate">
                     {currentUser.DepartmentName}
                   </p>
                 </div>
-                <ChevronDown className="w-4 h-4 text-sidebar-foreground/60" />
+                <ChevronDown className="w-4 h-4 text-slate-400" />
               </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-popover">
+            <DropdownMenuContent align="end" className="w-56 bg-slate-800 border-slate-700">
               <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">{currentUser.FullName}</p>
-                <p className="text-xs text-muted-foreground">{currentUser.Email}</p>
+                <p className="text-sm font-medium text-white">{currentUser.FullName}</p>
+                <p className="text-xs text-slate-400">{currentUser.Email}</p>
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSwitchUser}>
+              <DropdownMenuSeparator className="bg-slate-700" />
+              <DropdownMenuItem onClick={handleSwitchUser} className="text-slate-300 hover:bg-slate-700 hover:text-white">
                 <Building2 className="w-4 h-4 mr-2" />
                 Switch User
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+              <DropdownMenuSeparator className="bg-slate-700" />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-400 hover:bg-red-500/20 hover:text-red-300">
                 <LogOut className="w-4 h-4 mr-2" />
                 Log Out
               </DropdownMenuItem>

@@ -72,24 +72,24 @@ export default function ChainDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-        <Card className="max-w-2xl mx-auto mt-20 border-destructive">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <Card className="max-w-2xl mx-auto mt-20 border-0 shadow-xl">
           <CardContent className="p-8 text-center">
-            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-            <p className="text-lg font-medium text-destructive mb-4">{error}</p>
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-lg font-medium text-red-600 mb-4">{error}</p>
             <div className="flex gap-2 justify-center">
               <Button variant="outline" onClick={() => navigate('/chains')}>
                 Back to Chains
               </Button>
-              <Button onClick={loadData}>Retry</Button>
+              <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800" onClick={loadData}>Retry</Button>
             </div>
           </CardContent>
         </Card>
@@ -144,10 +144,10 @@ export default function ChainDetail() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       {/* Header */}
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => navigate('/chains')} className="mb-4 gap-2">
+        <Button variant="ghost" onClick={() => navigate('/chains')} className="mb-4 gap-2 hover:bg-white/80">
           <ArrowLeft className="w-4 h-4" />
           Back to Chains
         </Button>
@@ -156,18 +156,16 @@ export default function ChainDetail() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold text-slate-900">{chain.chainNumber}</h1>
-              <Badge
-                className={`bg-${chain.status.color} text-${chain.status.color.replace('400', '900')}`}
-              >
+              <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-md px-3 py-1">
                 {chain.status.name}
               </Badge>
             </div>
-            <p className="text-xl text-slate-600 mb-3">{chain.title}</p>
+            <p className="text-xl text-slate-700 font-semibold mb-3">{chain.title}</p>
             {chain.description && (
-              <p className="text-sm text-slate-500">{chain.description}</p>
+              <p className="text-sm text-slate-600">{chain.description}</p>
             )}
           </div>
-          <Button onClick={loadData} variant="outline" className="gap-2">
+          <Button onClick={loadData} className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
@@ -176,43 +174,43 @@ export default function ChainDetail() {
 
       {/* Chain Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-md hover:shadow-xl transition-all hover:scale-105">
+          <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Building2 className="w-5 h-5 text-blue-600" />
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                <Building2 className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Department</p>
-                <p className="font-medium">{chain.department.name}</p>
+                <p className="text-xs text-slate-500 font-medium">Department</p>
+                <p className="font-semibold text-slate-900">{chain.department.name}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-md hover:shadow-xl transition-all hover:scale-105">
+          <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <User className="w-5 h-5 text-purple-600" />
+              <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+                <User className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Vendor</p>
-                <p className="font-medium">{chain.vendor.name || 'Not specified'}</p>
+                <p className="text-xs text-slate-500 font-medium">Vendor</p>
+                <p className="font-semibold text-slate-900">{chain.vendor.name || 'Not specified'}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-md hover:shadow-xl transition-all hover:scale-105">
+          <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <DollarSign className="w-5 h-5 text-green-600" />
+              <div className="p-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl shadow-lg">
+                <DollarSign className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Amount</p>
-                <p className="font-medium">
+                <p className="text-xs text-slate-500 font-medium">Total Amount</p>
+                <p className="font-semibold text-slate-900">
                   {formatCurrency(chain.amounts.invoiced || chain.amounts.estimated)}
                 </p>
               </div>
@@ -220,15 +218,15 @@ export default function ChainDetail() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-md hover:shadow-xl transition-all hover:scale-105">
+          <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <Calendar className="w-5 h-5 text-amber-600" />
+              <div className="p-3 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+                <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Created</p>
-                <p className="font-medium">{formatDate(chain.createdAt)}</p>
+                <p className="text-xs text-slate-500 font-medium">Created</p>
+                <p className="font-semibold text-slate-900">{formatDate(chain.createdAt)}</p>
               </div>
             </div>
           </CardContent>
@@ -236,9 +234,12 @@ export default function ChainDetail() {
       </div>
 
       {/* Workflow Progress */}
-      <Card className="mb-6">
+      <Card className="mb-6 border-0 shadow-lg bg-gradient-to-br from-white to-blue-50">
         <CardHeader>
-          <CardTitle>Workflow Progress</CardTitle>
+          <CardTitle className="text-slate-900 flex items-center gap-2">
+            <div className="h-1 w-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+            Workflow Progress
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="relative">
@@ -302,16 +303,17 @@ export default function ChainDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Quotations */}
         {chain.expectedDocuments.hasQuotation && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+            <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-blue-50 to-white">
               <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                Quotations ({documents.quotations.length})
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-slate-900">Quotations ({documents.quotations.length})</span>
               </CardTitle>
               <Button
                 size="sm"
-                variant="outline"
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
                 onClick={() => navigate(`/quotations/upload?chainId=${chain.chainUuid}`)}
               >
                 <Plus className="w-4 h-4" />
@@ -320,7 +322,7 @@ export default function ChainDetail() {
             </CardHeader>
             <CardContent>
               {documents.quotations.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
+                <p className="text-sm text-slate-500 text-center py-6 italic">
                   No quotations added yet
                 </p>
               ) : (
@@ -328,12 +330,12 @@ export default function ChainDetail() {
                   {documents.quotations.map(quot => (
                     <div
                       key={quot.quotationId}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer"
+                      className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-blue-100"
                       onClick={() => navigate(`/quotations/${quot.quotationUuid}`)}
                     >
                       <div>
-                        <p className="font-medium">{quot.quotationNumber}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="font-semibold text-slate-900">{quot.quotationNumber}</p>
+                        <p className="text-sm text-slate-600">
                           {formatDate(quot.quotationDate)} • {formatCurrency(quot.totalAmount)}
                         </p>
                       </div>
@@ -348,16 +350,17 @@ export default function ChainDetail() {
 
         {/* LPOs */}
         {chain.expectedDocuments.hasLPO && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+            <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-indigo-50 to-white">
               <CardTitle className="text-lg flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-indigo-600" />
-                LPOs ({documents.lpos.length})
+                <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg">
+                  <ClipboardList className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-slate-900">LPOs ({documents.lpos.length})</span>
               </CardTitle>
               <Button
                 size="sm"
-                variant="outline"
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-md"
                 onClick={() => navigate(`/lpo/new?chainId=${chain.chainUuid}`)}
               >
                 <Plus className="w-4 h-4" />
@@ -366,7 +369,7 @@ export default function ChainDetail() {
             </CardHeader>
             <CardContent>
               {documents.lpos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
+                <p className="text-sm text-slate-500 text-center py-6 italic">
                   No LPOs created yet
                 </p>
               ) : (
@@ -374,16 +377,16 @@ export default function ChainDetail() {
                   {documents.lpos.map(lpo => (
                     <div
                       key={lpo.lpoId}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer"
+                      className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-indigo-100"
                       onClick={() => navigate(`/lpo/${lpo.lpoUuid}`)}
                     >
                       <div>
-                        <p className="font-medium">{lpo.lpoNumber}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="font-semibold text-slate-900">{lpo.lpoNumber}</p>
+                        <p className="text-sm text-slate-600">
                           {formatDate(lpo.lpoDate)} • {formatCurrency(lpo.totalAmount)}
                         </p>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                      <ArrowRight className="w-4 h-4 text-slate-400" />
                     </div>
                   ))}
                 </div>
@@ -394,16 +397,17 @@ export default function ChainDetail() {
 
         {/* Delivery Orders */}
         {chain.expectedDocuments.hasDeliveryOrder && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+            <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-purple-50 to-white">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Truck className="w-5 h-5 text-purple-600" />
-                Delivery Orders ({documents.deliveryOrders.length})
+                <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
+                  <Truck className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-slate-900">Delivery Orders ({documents.deliveryOrders.length})</span>
               </CardTitle>
               <Button
                 size="sm"
-                variant="outline"
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-md"
                 onClick={() => navigate(`/delivery-orders/new?chainId=${chain.chainUuid}`)}
               >
                 <Plus className="w-4 h-4" />
@@ -412,7 +416,7 @@ export default function ChainDetail() {
             </CardHeader>
             <CardContent>
               {documents.deliveryOrders.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
+                <p className="text-sm text-slate-500 text-center py-6 italic">
                   No delivery orders recorded
                 </p>
               ) : (
@@ -420,16 +424,16 @@ export default function ChainDetail() {
                   {documents.deliveryOrders.map(dorder => (
                     <div
                       key={dorder.doId}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer"
+                      className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-purple-100"
                       onClick={() => navigate(`/delivery-orders/${dorder.doUuid}`)}
                     >
                       <div>
-                        <p className="font-medium">{dorder.doNumber}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="font-semibold text-slate-900">{dorder.doNumber}</p>
+                        <p className="text-sm text-slate-600">
                           {formatDate(dorder.deliveryDate)} • {dorder.itemsReceived}/{dorder.itemsTotal} items
                         </p>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                      <ArrowRight className="w-4 h-4 text-slate-400" />
                     </div>
                   ))}
                 </div>
@@ -440,16 +444,17 @@ export default function ChainDetail() {
 
         {/* Invoices */}
         {chain.expectedDocuments.hasInvoice && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+            <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-teal-50 to-white">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-teal-600" />
-                Invoices ({documents.invoices.length})
+                <div className="p-2 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg">
+                  <Receipt className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-slate-900">Invoices ({documents.invoices.length})</span>
               </CardTitle>
               <Button
                 size="sm"
-                variant="outline"
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white shadow-md"
                 onClick={() => navigate(`/upload?chainId=${chain.chainUuid}`)}
               >
                 <Plus className="w-4 h-4" />
@@ -458,7 +463,7 @@ export default function ChainDetail() {
             </CardHeader>
             <CardContent>
               {documents.invoices.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
+                <p className="text-sm text-slate-500 text-center py-6 italic">
                   No invoices uploaded
                 </p>
               ) : (
@@ -466,16 +471,16 @@ export default function ChainDetail() {
                   {documents.invoices.map(inv => (
                     <div
                       key={inv.invoiceId}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer"
+                      className="flex items-center justify-between p-3 bg-gradient-to-r from-teal-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-teal-100"
                       onClick={() => navigate(`/invoices/${inv.invoiceUuid}`)}
                     >
                       <div>
-                        <p className="font-medium">{inv.invoiceNumber}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="font-semibold text-slate-900">{inv.invoiceNumber}</p>
+                        <p className="text-sm text-slate-600">
                           {formatDate(inv.invoiceDate)} • {formatCurrency(inv.totalAmount)}
                         </p>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                      <ArrowRight className="w-4 h-4 text-slate-400" />
                     </div>
                   ))}
                 </div>
@@ -485,16 +490,17 @@ export default function ChainDetail() {
         )}
 
         {/* Payments */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
+          <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-emerald-50 to-white">
             <CardTitle className="text-lg flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-green-600" />
-              Payments ({documents.payments.length})
+              <div className="p-2 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg">
+                <CreditCard className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-slate-900">Payments ({documents.payments.length})</span>
             </CardTitle>
             <Button
               size="sm"
-              variant="outline"
-              className="gap-2"
+              className="gap-2 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white shadow-md"
               onClick={() => navigate(`/payments/new?chainId=${chain.chainUuid}`)}
             >
               <Plus className="w-4 h-4" />
@@ -503,7 +509,7 @@ export default function ChainDetail() {
           </CardHeader>
           <CardContent>
             {documents.payments.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
+              <p className="text-sm text-slate-500 text-center py-6 italic">
                 No payments recorded
               </p>
             ) : (
@@ -511,15 +517,15 @@ export default function ChainDetail() {
                 {documents.payments.map(payment => (
                   <div
                     key={payment.paymentId}
-                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-gradient-to-r from-emerald-50 to-white rounded-lg border border-emerald-100"
                   >
                     <div>
-                      <p className="font-medium">{payment.referenceNumber}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-semibold text-slate-900">{payment.referenceNumber}</p>
+                      <p className="text-sm text-slate-600">
                         {formatDate(payment.paymentDate)} • {payment.paymentMethod}
                       </p>
                     </div>
-                    <p className="font-medium text-green-600">
+                    <p className="font-semibold text-emerald-600">
                       {formatCurrency(payment.amount)}
                     </p>
                   </div>
