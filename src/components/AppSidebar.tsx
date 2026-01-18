@@ -76,7 +76,7 @@ export function AppSidebar() {
         {/* Procurement Section */}
         <div className="pt-6 pb-2">
           <p className="px-4 text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-            <div className="h-0.5 w-4 bg-gradient-to-r from-blue-500 to-transparent"></div>
+            <span className="h-0.5 w-4 bg-gradient-to-r from-blue-500 to-transparent block"></span>
             Procurement
           </p>
         </div>
@@ -103,7 +103,7 @@ export function AppSidebar() {
           <>
             <div className="pt-6 pb-2">
               <p className="px-4 text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
-                <div className="h-0.5 w-4 bg-gradient-to-r from-purple-500 to-transparent"></div>
+                <span className="h-0.5 w-4 bg-gradient-to-r from-purple-500 to-transparent block"></span>
                 Assets
               </p>
             </div>
@@ -129,7 +129,7 @@ export function AppSidebar() {
           <>
             <div className="pt-6 pb-2">
               <p className="px-4 text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                <div className="h-0.5 w-4 bg-gradient-to-r from-amber-500 to-transparent"></div>
+                <span className="h-0.5 w-4 bg-gradient-to-r from-amber-500 to-transparent block"></span>
                 Reports
               </p>
             </div>

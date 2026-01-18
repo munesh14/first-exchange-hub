@@ -384,7 +384,7 @@ export async function createChain(params: CreateChainParams): Promise<{ success:
     BranchID: params.branchId,
     IsDirectPurchase: params.isDirectPurchase,
     Notes: params.notes,
-    CreatedBy: params.createdBy,
+    CreatedBy: params.createdBy.toString(), // Backend expects string
     // Note: hasQuotation, hasLPO, etc. are stored in ExpectedDocuments table via backend logic
     HasQuotation: params.hasQuotation,
     HasLPO: params.hasLPO,
@@ -402,7 +402,21 @@ export async function createChain(params: CreateChainParams): Promise<{ success:
   if (!response.ok) {
     throw new Error(`Failed to create chain: ${response.statusText}`);
   }
-  return response.json();
+  const result = await response.json();
+
+  // Transform backend response (PascalCase) to match expected format (camelCase)
+  if (result.success && result.data) {
+    return {
+      success: true,
+      data: {
+        chainId: result.data.ChainID,
+        chainUuid: result.data.ChainUUID,
+        chainNumber: result.data.ChainNumber,
+      },
+    };
+  }
+
+  return result;
 }
 
 // Legacy functions for backwards compatibility
