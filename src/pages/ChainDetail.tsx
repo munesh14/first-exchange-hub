@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { WorkflowProgress } from '@/components/WorkflowProgress';
 import {
   ArrowLeft,
   RefreshCw,
@@ -99,49 +100,20 @@ export default function ChainDetail() {
 
   const { chain, documents, assets, activityLog } = data;
 
-  // Workflow stages
-  const stages = [
-    {
-      key: 'quotation',
-      label: 'Quotation',
-      icon: <FileText className="w-5 h-5" />,
-      count: documents.quotations.length,
-      expected: chain.expectedDocuments.hasQuotation,
-      color: 'blue',
-    },
-    {
-      key: 'lpo',
-      label: 'LPO',
-      icon: <ClipboardList className="w-5 h-5" />,
-      count: documents.lpos.length,
-      expected: chain.expectedDocuments.hasLPO,
-      color: 'indigo',
-    },
-    {
-      key: 'delivery',
-      label: 'Delivery',
-      icon: <Truck className="w-5 h-5" />,
-      count: documents.deliveryOrders.length,
-      expected: chain.expectedDocuments.hasDeliveryOrder,
-      color: 'purple',
-    },
-    {
-      key: 'invoice',
-      label: 'Invoice',
-      icon: <Receipt className="w-5 h-5" />,
-      count: documents.invoices.length,
-      expected: chain.expectedDocuments.hasInvoice,
-      color: 'teal',
-    },
-    {
-      key: 'payment',
-      label: 'Payment',
-      icon: <CreditCard className="w-5 h-5" />,
-      count: documents.payments.length,
-      expected: true,
-      color: 'green',
-    },
-  ];
+  // Calculate workflow progress states
+  const workflowData = {
+    quotations: documents.quotations.length,
+    lpos: documents.lpos.length,
+    lpoApproved: documents.lpos.some(lpo => lpo.status === 'APPROVED' || lpo.status === 'Approved'),
+    deliveryOrders: documents.deliveryOrders.length,
+    doReceived: documents.deliveryOrders.some(
+      d => d.status === 'RECEIVED' || d.itemsReceived === d.itemsTotal
+    ),
+    invoices: documents.invoices.length,
+    invoiceApproved: documents.invoices.some(inv => inv.status === 'APPROVED' || inv.status === 'Approved'),
+    payments: documents.payments.length,
+    fullyPaid: chain.amounts.balance === 0 && chain.amounts.paid > 0,
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
@@ -242,60 +214,7 @@ export default function ChainDetail() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            {/* Progress Line */}
-            <div className="absolute top-8 left-0 right-0 h-0.5 bg-slate-200 hidden lg:block" />
-
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-              {stages.map((stage, index) => {
-                const isActive = stage.count > 0;
-                const isCompleted = isActive && stage.count > 0;
-                const bgColor = isActive
-                  ? `bg-${stage.color}-100`
-                  : 'bg-slate-100';
-                const textColor = isActive
-                  ? `text-${stage.color}-700`
-                  : 'text-slate-500';
-
-                return (
-                  <div key={stage.key} className="relative flex flex-col items-center text-center">
-                    {/* Connector line (mobile) */}
-                    {index < stages.length - 1 && (
-                      <div className="absolute left-1/2 top-16 h-12 w-0.5 bg-slate-200 lg:hidden" />
-                    )}
-
-                    {/* Stage Circle */}
-                    <div
-                      className={`relative z-10 w-16 h-16 rounded-full flex items-center justify-center ${bgColor} ${textColor} mb-2`}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle className="w-6 h-6" />
-                      ) : (
-                        stage.icon
-                      )}
-                    </div>
-
-                    {/* Stage Label */}
-                    <p className={`font-medium mb-1 ${textColor}`}>{stage.label}</p>
-
-                    {/* Document Count */}
-                    {stage.expected && (
-                      <Badge
-                        variant={isActive ? 'default' : 'outline'}
-                        className={isActive ? `bg-${stage.color}-600` : ''}
-                      >
-                        {stage.count} {stage.count === 1 ? 'doc' : 'docs'}
-                      </Badge>
-                    )}
-
-                    {!stage.expected && (
-                      <span className="text-xs text-muted-foreground">N/A</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <WorkflowProgress documents={workflowData} status={chain.status.code} />
         </CardContent>
       </Card>
 
@@ -305,43 +224,80 @@ export default function ChainDetail() {
         {chain.expectedDocuments.hasQuotation && (
           <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-blue-50 to-white">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow">
                   <FileText className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-slate-900">Quotations ({documents.quotations.length})</span>
-              </CardTitle>
-              <Button
-                size="sm"
-                className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md"
-                onClick={() => navigate(`/quotations/upload?chainId=${chain.chainUuid}`)}
-              >
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
+                <div>
+                  <CardTitle className="text-lg text-slate-900">
+                    QUOTATION{documents.quotations.length > 1 ? 'S' : ''} {documents.quotations.length > 1 ? `(${documents.quotations.length})` : ''}
+                  </CardTitle>
+                </div>
+              </div>
+              <Badge className={documents.quotations.length > 0 ? "bg-emerald-100 text-emerald-700 border-emerald-200 border" : "bg-blue-100 text-blue-700 border-blue-200 border"}>
+                {documents.quotations.length > 0 ? '✓ UPLOADED' : '○ NEXT'}
+              </Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {documents.quotations.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6 italic">
-                  No quotations added yet
-                </p>
+                <div className="text-center py-8">
+                  <p className="text-slate-600 mb-4">Ready to add quotation</p>
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all"
+                    onClick={() => navigate(`/quotations/upload?chainId=${chain.chainUuid}`)}
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add Quotation
+                  </Button>
+                </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {documents.quotations.map(quot => (
                     <div
                       key={quot.quotationId}
-                      className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-blue-100"
-                      onClick={() => navigate(`/quotations/${quot.quotationUuid}`)}
+                      className="p-4 bg-gradient-to-r from-blue-50 to-white rounded-lg border border-blue-100 hover:shadow-md transition-all"
                     >
-                      <div>
-                        <p className="font-semibold text-slate-900">{quot.quotationNumber}</p>
-                        <p className="text-sm text-slate-600">
-                          {formatDate(quot.quotationDate)} • {formatCurrency(quot.totalAmount)}
-                        </p>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-slate-900 text-lg">{quot.quotationNumber}</p>
+                          <p className="text-sm text-slate-600">{quot.vendorName}</p>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Uploaded: {formatDate(quot.quotationDate)} • {formatCurrency(quot.totalAmount)}
+                          </p>
+                        </div>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => navigate(`/quotations/${quot.quotationUuid}`)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => window.open(`/api/quotations/${quot.quotationUuid}/download`, '_blank')}
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-2 border-dashed"
+                    onClick={() => navigate(`/quotations/upload?chainId=${chain.chainUuid}`)}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Another Quotation
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -352,41 +308,90 @@ export default function ChainDetail() {
         {chain.expectedDocuments.hasLPO && (
           <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-indigo-50 to-white">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow">
                   <ClipboardList className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-slate-900">LPOs ({documents.lpos.length})</span>
-              </CardTitle>
-              <Button
-                size="sm"
-                className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-md"
-                onClick={() => navigate(`/lpo/new?chainId=${chain.chainUuid}`)}
-              >
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
+                <div>
+                  <CardTitle className="text-lg text-slate-900">
+                    LPO{documents.lpos.length > 1 ? 'S' : ''} {documents.lpos.length > 1 ? `(${documents.lpos.length})` : ''}
+                  </CardTitle>
+                </div>
+              </div>
+              <Badge className={
+                workflowData.lpoApproved ? "bg-emerald-100 text-emerald-700 border-emerald-200 border" :
+                documents.lpos.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200 border" :
+                documents.quotations.length > 0 ? "bg-blue-100 text-blue-700 border-blue-200 border" :
+                "bg-slate-100 text-slate-500 border-slate-200 border"
+              }>
+                {workflowData.lpoApproved ? '✓ APPROVED' :
+                 documents.lpos.length > 0 ? '⋯ PENDING APPROVAL' :
+                 documents.quotations.length > 0 ? '○ NEXT' :
+                 '○ WAITING'}
+              </Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {documents.lpos.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6 italic">
-                  No LPOs created yet
-                </p>
+                documents.quotations.length > 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-600 mb-4">Ready to create LPO from quotation</p>
+                    <Button
+                      size="lg"
+                      className="gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-lg hover:shadow-xl transition-all"
+                      onClick={() => navigate(`/lpo/new?chainId=${chain.chainUuid}`)}
+                    >
+                      <Plus className="w-5 h-5" />
+                      Create LPO
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-slate-400 italic">Waiting for quotation</p>
+                    <Button size="lg" disabled className="gap-2 mt-4 opacity-50">
+                      <Plus className="w-5 h-5" />
+                      Create LPO
+                    </Button>
+                  </div>
+                )
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {documents.lpos.map(lpo => (
                     <div
                       key={lpo.lpoId}
-                      className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-indigo-100"
-                      onClick={() => navigate(`/lpo/${lpo.lpoUuid}`)}
+                      className="p-4 bg-gradient-to-r from-indigo-50 to-white rounded-lg border border-indigo-100 hover:shadow-md transition-all"
                     >
-                      <div>
-                        <p className="font-semibold text-slate-900">{lpo.lpoNumber}</p>
-                        <p className="text-sm text-slate-600">
-                          {formatDate(lpo.lpoDate)} • {formatCurrency(lpo.totalAmount)}
-                        </p>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-slate-900 text-lg">{lpo.lpoNumber}</p>
+                          <p className="text-sm text-slate-600">{lpo.vendorName}</p>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Created: {formatDate(lpo.lpoDate)} • {formatCurrency(lpo.totalAmount)}
+                          </p>
+                          <Badge variant="outline" className="mt-2">
+                            {lpo.status}
+                          </Badge>
+                        </div>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-slate-400" />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => navigate(`/lpo/${lpo.lpoUuid}`)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => window.open(`/api/lpos/${lpo.lpoUuid}/download`, '_blank')}
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -399,43 +404,91 @@ export default function ChainDetail() {
         {chain.expectedDocuments.hasDeliveryOrder && (
           <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-purple-50 to-white">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow">
                   <Truck className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-slate-900">Delivery Orders ({documents.deliveryOrders.length})</span>
-              </CardTitle>
-              <Button
-                size="sm"
-                className="gap-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-md"
-                onClick={() => navigate(`/delivery-orders/new?chainId=${chain.chainUuid}`)}
-              >
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
+                <div>
+                  <CardTitle className="text-lg text-slate-900">
+                    DELIVERY ORDER{documents.deliveryOrders.length > 1 ? 'S' : ''} {documents.deliveryOrders.length > 1 ? `(${documents.deliveryOrders.length})` : ''}
+                  </CardTitle>
+                </div>
+              </div>
+              <Badge className={
+                workflowData.doReceived ? "bg-emerald-100 text-emerald-700 border-emerald-200 border" :
+                documents.deliveryOrders.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200 border" :
+                workflowData.lpoApproved ? "bg-blue-100 text-blue-700 border-blue-200 border" :
+                "bg-slate-100 text-slate-500 border-slate-200 border"
+              }>
+                {workflowData.doReceived ? '✓ RECEIVED' :
+                 documents.deliveryOrders.length > 0 ? '⋯ PARTIAL' :
+                 workflowData.lpoApproved ? '○ NEXT' :
+                 '○ WAITING'}
+              </Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {documents.deliveryOrders.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6 italic">
-                  No delivery orders recorded
-                </p>
+                workflowData.lpoApproved ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-600 mb-4">Ready to record delivery</p>
+                    <Button
+                      size="lg"
+                      className="gap-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg hover:shadow-xl transition-all"
+                      onClick={() => navigate(`/delivery-orders/new?chainId=${chain.chainUuid}`)}
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Delivery Order
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-slate-400 italic">Waiting for LPO approval</p>
+                    <Button size="lg" disabled className="gap-2 mt-4 opacity-50">
+                      <Plus className="w-5 h-5" />
+                      Add Delivery Order
+                    </Button>
+                  </div>
+                )
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {documents.deliveryOrders.map(dorder => (
                     <div
                       key={dorder.doId}
-                      className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-purple-100"
-                      onClick={() => navigate(`/delivery-orders/${dorder.doUuid}`)}
+                      className="p-4 bg-gradient-to-r from-purple-50 to-white rounded-lg border border-purple-100 hover:shadow-md transition-all"
                     >
-                      <div>
-                        <p className="font-semibold text-slate-900">{dorder.doNumber}</p>
-                        <p className="text-sm text-slate-600">
-                          {formatDate(dorder.deliveryDate)} • {dorder.itemsReceived}/{dorder.itemsTotal} items
-                        </p>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-slate-900 text-lg">{dorder.doNumber}</p>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Delivered: {formatDate(dorder.deliveryDate)} • {dorder.itemsReceived}/{dorder.itemsTotal} items
+                          </p>
+                          <Badge variant="outline" className="mt-2">
+                            {dorder.status}
+                          </Badge>
+                        </div>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-slate-400" />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => navigate(`/delivery-orders/${dorder.doUuid}`)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </Button>
+                      </div>
                     </div>
                   ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-2 border-dashed"
+                    onClick={() => navigate(`/delivery-orders/new?chainId=${chain.chainUuid}`)}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Another Delivery
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -446,43 +499,101 @@ export default function ChainDetail() {
         {chain.expectedDocuments.hasInvoice && (
           <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
             <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-teal-50 to-white">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg shadow">
                   <Receipt className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-slate-900">Invoices ({documents.invoices.length})</span>
-              </CardTitle>
-              <Button
-                size="sm"
-                className="gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white shadow-md"
-                onClick={() => navigate(`/upload?chainId=${chain.chainUuid}`)}
-              >
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
+                <div>
+                  <CardTitle className="text-lg text-slate-900">
+                    INVOICE{documents.invoices.length > 1 ? 'S' : ''} {documents.invoices.length > 1 ? `(${documents.invoices.length})` : ''}
+                  </CardTitle>
+                </div>
+              </div>
+              <Badge className={
+                workflowData.invoiceApproved ? "bg-emerald-100 text-emerald-700 border-emerald-200 border" :
+                documents.invoices.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200 border" :
+                workflowData.doReceived ? "bg-blue-100 text-blue-700 border-blue-200 border" :
+                "bg-slate-100 text-slate-500 border-slate-200 border"
+              }>
+                {workflowData.invoiceApproved ? '✓ APPROVED' :
+                 documents.invoices.length > 0 ? '⋯ PENDING APPROVAL' :
+                 workflowData.doReceived ? '○ NEXT' :
+                 '○ WAITING'}
+              </Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {documents.invoices.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6 italic">
-                  No invoices uploaded
-                </p>
+                workflowData.doReceived ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-600 mb-4">Ready to add invoice</p>
+                    <Button
+                      size="lg"
+                      className="gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white shadow-lg hover:shadow-xl transition-all"
+                      onClick={() => navigate(`/upload?chainId=${chain.chainUuid}`)}
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Invoice
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-slate-400 italic">Waiting for delivery confirmation</p>
+                    <Button size="lg" disabled className="gap-2 mt-4 opacity-50">
+                      <Plus className="w-5 h-5" />
+                      Add Invoice
+                    </Button>
+                  </div>
+                )
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {documents.invoices.map(inv => (
                     <div
                       key={inv.invoiceId}
-                      className="flex items-center justify-between p-3 bg-gradient-to-r from-teal-50 to-white rounded-lg hover:shadow-md cursor-pointer transition-all border border-teal-100"
-                      onClick={() => navigate(`/invoices/${inv.invoiceUuid}`)}
+                      className="p-4 bg-gradient-to-r from-teal-50 to-white rounded-lg border border-teal-100 hover:shadow-md transition-all"
                     >
-                      <div>
-                        <p className="font-semibold text-slate-900">{inv.invoiceNumber}</p>
-                        <p className="text-sm text-slate-600">
-                          {formatDate(inv.invoiceDate)} • {formatCurrency(inv.totalAmount)}
-                        </p>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-slate-900 text-lg">{inv.invoiceNumber}</p>
+                          <p className="text-sm text-slate-600">{inv.vendorName}</p>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Date: {formatDate(inv.invoiceDate)} • {formatCurrency(inv.totalAmount)}
+                          </p>
+                          <Badge variant="outline" className="mt-2">
+                            {inv.status}
+                          </Badge>
+                        </div>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-slate-400" />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => navigate(`/invoices/${inv.invoiceUuid}`)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => window.open(`/api/invoices/${inv.invoiceUuid}/download`, '_blank')}
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-2 border-dashed"
+                    onClick={() => navigate(`/upload?chainId=${chain.chainUuid}`)}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Another Invoice
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -492,44 +603,90 @@ export default function ChainDetail() {
         {/* Payments */}
         <Card className="border-0 shadow-lg hover:shadow-xl transition-all">
           <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-emerald-50 to-white">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <div className="p-2 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg shadow">
                 <CreditCard className="w-5 h-5 text-white" />
               </div>
-              <span className="text-slate-900">Payments ({documents.payments.length})</span>
-            </CardTitle>
-            <Button
-              size="sm"
-              className="gap-2 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white shadow-md"
-              onClick={() => navigate(`/payments/new?chainId=${chain.chainUuid}`)}
-            >
-              <Plus className="w-4 h-4" />
-              Add
-            </Button>
+              <div>
+                <CardTitle className="text-lg text-slate-900">
+                  PAYMENT{documents.payments.length > 1 ? 'S' : ''} {documents.payments.length > 1 ? `(${documents.payments.length})` : ''}
+                </CardTitle>
+              </div>
+            </div>
+            <Badge className={
+              workflowData.fullyPaid ? "bg-emerald-100 text-emerald-700 border-emerald-200 border" :
+              documents.payments.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200 border" :
+              workflowData.invoiceApproved ? "bg-blue-100 text-blue-700 border-blue-200 border" :
+              "bg-slate-100 text-slate-500 border-slate-200 border"
+            }>
+              {workflowData.fullyPaid ? '✓ PAID' :
+               documents.payments.length > 0 ? '⋯ PARTIAL' :
+               workflowData.invoiceApproved ? '○ NEXT' :
+               '○ WAITING'}
+            </Badge>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             {documents.payments.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-6 italic">
-                No payments recorded
-              </p>
+              workflowData.invoiceApproved ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-600 mb-4">Ready to record payment</p>
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all"
+                    onClick={() => navigate(`/payments/new?chainId=${chain.chainUuid}`)}
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add Payment
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-slate-400 italic">Waiting for invoice approval</p>
+                  <Button size="lg" disabled className="gap-2 mt-4 opacity-50">
+                    <Plus className="w-5 h-5" />
+                    Add Payment
+                  </Button>
+                </div>
+              )
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {documents.payments.map(payment => (
                   <div
                     key={payment.paymentId}
-                    className="flex items-center justify-between p-3 bg-gradient-to-r from-emerald-50 to-white rounded-lg border border-emerald-100"
+                    className="p-4 bg-gradient-to-r from-emerald-50 to-white rounded-lg border border-emerald-100"
                   >
-                    <div>
-                      <p className="font-semibold text-slate-900">{payment.referenceNumber}</p>
-                      <p className="text-sm text-slate-600">
-                        {formatDate(payment.paymentDate)} • {payment.paymentMethod}
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-semibold text-slate-900 text-lg">{payment.referenceNumber}</p>
+                        <p className="text-sm text-slate-600 mt-1">
+                          {formatDate(payment.paymentDate)} • {payment.paymentMethod}
+                        </p>
+                      </div>
+                      <p className="font-bold text-emerald-600 text-xl">
+                        {formatCurrency(payment.amount)}
                       </p>
                     </div>
-                    <p className="font-semibold text-emerald-600">
-                      {formatCurrency(payment.amount)}
-                    </p>
                   </div>
                 ))}
+                {!workflowData.fullyPaid && (
+                  <>
+                    <div className="border-t pt-3 flex justify-between items-center text-sm">
+                      <span className="text-slate-600">Balance Remaining:</span>
+                      <span className="font-semibold text-amber-600">
+                        {formatCurrency(chain.amounts.balance)}
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full gap-2 border-dashed"
+                      onClick={() => navigate(`/payments/new?chainId=${chain.chainUuid}`)}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Another Payment
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </CardContent>
@@ -570,44 +727,87 @@ export default function ChainDetail() {
       </div>
 
       {/* Activity Log */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
+      <Card className="border-0 shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-slate-50 to-white">
+          <CardTitle className="flex items-center gap-2 text-slate-900">
+            <div className="p-2 bg-gradient-to-br from-slate-500 to-slate-600 rounded-lg">
+              <Clock className="w-5 h-5 text-white" />
+            </div>
             Activity Log
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {activityLog.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No activity recorded
+            <p className="text-sm text-slate-500 text-center py-8 italic">
+              No activity recorded yet
             </p>
           ) : (
-            <div className="space-y-3">
-              {activityLog.map(log => (
-                <div key={log.logId} className="flex gap-4 pb-3 border-b last:border-0">
-                  <div className="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-primary" />
-                  <div className="flex-1">
-                    <p className="font-medium">{log.activityDescription}</p>
-                    <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                      <span>{log.performedBy.name}</span>
-                      <span>•</span>
-                      <span>{formatDate(log.performedAt)}</span>
+            <div className="space-y-4">
+              {activityLog.map(log => {
+                // Determine dot color based on activity type
+                const getDotColor = () => {
+                  const type = log.activityType.toLowerCase();
+                  if (type.includes('create')) return 'bg-slate-400';
+                  if (type.includes('upload') || type.includes('add')) return 'bg-blue-500';
+                  if (type.includes('submit')) return 'bg-amber-500';
+                  if (type.includes('approve')) return 'bg-emerald-500';
+                  if (type.includes('reject')) return 'bg-red-500';
+                  if (type.includes('receive')) return 'bg-green-500';
+                  if (type.includes('pay') || type.includes('paid')) return 'bg-emerald-600';
+                  return 'bg-slate-400';
+                };
+
+                const formatTime = (dateStr: string) => {
+                  const date = new Date(dateStr);
+                  return date.toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+                };
+
+                return (
+                  <div key={log.logId} className="flex gap-4 pb-4 border-b last:border-0 last:pb-0">
+                    {/* Colored dot indicator */}
+                    <div className="flex-shrink-0 pt-1">
+                      <div className={`w-3 h-3 rounded-full ${getDotColor()} shadow-md`} />
+                    </div>
+
+                    {/* Activity content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className="font-semibold text-slate-900 leading-tight">
+                            {log.activityDescription}
+                          </p>
+                          <p className="text-sm text-slate-600 mt-1">
+                            by {log.performedBy.name}
+                          </p>
+                        </div>
+                        <time className="text-xs text-slate-500 whitespace-nowrap">
+                          {formatTime(log.performedAt)}
+                        </time>
+                      </div>
+
                       {log.newStatus && (
-                        <>
-                          <span>•</span>
-                          <Badge variant="outline" className="text-xs">
-                            {log.newStatus.name}
-                          </Badge>
-                        </>
+                        <Badge
+                          className="mt-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0"
+                          variant="default"
+                        >
+                          → {log.newStatus.name}
+                        </Badge>
+                      )}
+
+                      {log.notes && (
+                        <p className="text-sm text-slate-600 mt-2 italic bg-slate-50 p-2 rounded border-l-2 border-slate-300">
+                          {log.notes}
+                        </p>
                       )}
                     </div>
-                    {log.notes && (
-                      <p className="text-sm text-muted-foreground mt-1">{log.notes}</p>
-                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
