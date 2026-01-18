@@ -1,216 +1,270 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { listChains, getChainStats } from '@/lib/api-chain';
 import { useUser } from '@/contexts/UserContext';
-import { PageHeader } from '@/components/PageHeader';
-import { StatCard } from '@/components/StatCard';
-import { StatusBadge } from '@/components/StatusBadge';
+import { PipelineProgress } from '@/components/PipelineProgress';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  FileCheck,
-  DollarSign,
-  Upload,
+  Plus,
+  Search,
   ArrowRight,
-  FileText,
   RefreshCw,
+  Activity,
+  CheckCircle,
+  DollarSign,
+  Clock,
 } from 'lucide-react';
-import { format } from 'date-fns';
 
 export default function Dashboard() {
   const { currentUser } = useUser();
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const { data: stats, isLoading: statsLoading, refetch: refetchStats, isFetching: statsFetching } = useQuery({
-    queryKey: ['stats'],
-    queryFn: api.getStats,
+  // Fetch chain stats
+  const { data: statsResponse, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+    queryKey: ['chain-stats'],
+    queryFn: getChainStats,
   });
 
-  const { data: invoices, isLoading: invoicesLoading, refetch: refetchInvoices, isFetching: invoicesFetching } = useQuery({
-    queryKey: ['invoices', 'recent'],
-    queryFn: () => api.getInvoices(),
+  // Fetch chains list
+  const { data: chainsResponse, isLoading: chainsLoading, refetch: refetchChains } = useQuery({
+    queryKey: ['chains'],
+    queryFn: () => listChains({ limit: 20 }),
   });
 
-  const isRefreshing = statsFetching || invoicesFetching;
+  const stats = statsResponse?.data;
+  const chains = chainsResponse?.chains || [];
 
   const handleRefresh = () => {
     refetchStats();
-    refetchInvoices();
+    refetchChains();
   };
 
-  const recentInvoices = invoices?.slice(0, 10) || [];
+  // Filter chains by search query
+  const filteredChains = chains.filter(chain =>
+    chain.chainNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    chain.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    chain.vendor.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const formatCurrency = (amount: number | null) => {
+    if (amount === null || amount === undefined || amount === 0) return '0.000';
+    return amount.toLocaleString('en-OM', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  };
+
+  const getStatusColor = (statusCode: string) => {
+    switch (statusCode) {
+      case 'DRAFT': return 'bg-gradient-to-r from-slate-500 to-slate-600 text-white border-2 border-slate-400';
+      case 'IN_PROGRESS': return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border-2 border-blue-400';
+      case 'PENDING_APPROVAL': return 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-2 border-amber-400';
+      case 'COMPLETED': return 'bg-gradient-to-r from-emerald-500 to-green-600 text-white border-2 border-emerald-400';
+      case 'CANCELLED': return 'bg-gradient-to-r from-red-500 to-red-600 text-white border-2 border-red-400';
+      default: return 'bg-gradient-to-r from-slate-500 to-slate-600 text-white border-2 border-slate-400';
+    }
+  };
 
   return (
-    <div className="animate-fade-in">
-      <PageHeader
-        title={`Welcome back, ${currentUser?.FullName?.split(' ')[0]}!`}
-        description="Here's what's happening with your invoices today."
-        actions={
-          <>
-            <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing} className="gap-2">
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Link to="/upload">
-              <Button className="gap-2">
-                <Upload className="w-4 h-4" />
-                Upload Invoice
-              </Button>
-            </Link>
-          </>
-        }
-      />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header */}
+      <div className="p-6 pb-4">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+              Welcome back, {currentUser?.FullName?.split(' ')[0]}!
+            </h1>
+            <p className="text-slate-600 mt-1">Here's your procurement overview</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            className="rounded-full hover:bg-white/80"
+          >
+            <RefreshCw className={`w-5 h-5 text-slate-600 ${statsLoading || chainsLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        <StatCard
-          title="Pending Review"
-          value={statsLoading ? '...' : stats?.PendingReview || 0}
-          icon={<Clock className="w-6 h-6" />}
-          iconBgColor="bg-yellow-100"
-          iconColor="text-yellow-600"
-        />
-        <StatCard
-          title="Pending Approval"
-          value={statsLoading ? '...' : stats?.PendingApproval || 0}
-          icon={<FileCheck className="w-6 h-6" />}
-          iconBgColor="bg-blue-100"
-          iconColor="text-blue-600"
-        />
-        <StatCard
-          title="Approved"
-          value={statsLoading ? '...' : stats?.Approved || 0}
-          icon={<CheckCircle className="w-6 h-6" />}
-          iconBgColor="bg-green-100"
-          iconColor="text-green-600"
-        />
-        <StatCard
-          title="Rejected"
-          value={statsLoading ? '...' : stats?.Rejected || 0}
-          icon={<XCircle className="w-6 h-6" />}
-          iconBgColor="bg-red-100"
-          iconColor="text-red-600"
-        />
-        <StatCard
-          title="Correction Needed"
-          value={statsLoading ? '...' : stats?.CorrectionNeeded || 0}
-          icon={<AlertTriangle className="w-6 h-6" />}
-          iconBgColor="bg-orange-100"
-          iconColor="text-orange-600"
-        />
-        <StatCard
-          title="Total Approved"
-          value={
-            statsLoading
-              ? '...'
-              : `${(stats?.TotalApprovedOMR || 0).toLocaleString('en-OM', {
-                  minimumFractionDigits: 3,
-                  maximumFractionDigits: 3,
-                })}`
-          }
-          icon={<DollarSign className="w-6 h-6" />}
-          iconBgColor="bg-accent/10"
-          iconColor="text-accent"
-        />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* Active Chains */}
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 border-0 shadow-lg hover:shadow-xl transition-all hover:scale-105">
+            <CardContent className="p-6 relative overflow-hidden">
+              <Activity className="absolute top-4 right-4 w-16 h-16 text-white opacity-20" />
+              <div className="relative z-10">
+                <p className="text-sm font-medium text-blue-100 mb-1">Active Chains</p>
+                <p className="text-4xl font-bold text-white">
+                  {statsLoading ? '...' : stats?.activeChains || 0}
+                </p>
+                <div className="mt-4 pt-4 border-t border-blue-400/30">
+                  <p className="text-xs text-blue-100">In progress</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pending Approval */}
+          <Card className="bg-gradient-to-br from-amber-500 to-orange-600 border-0 shadow-lg hover:shadow-xl transition-all hover:scale-105">
+            <CardContent className="p-6 relative overflow-hidden">
+              <Clock className="absolute top-4 right-4 w-16 h-16 text-white opacity-20" />
+              <div className="relative z-10">
+                <p className="text-sm font-medium text-amber-100 mb-1">Pending Approval</p>
+                <p className="text-4xl font-bold text-white">
+                  {statsLoading ? '...' : stats?.pendingApproval || 0}
+                </p>
+                <div className="mt-4 pt-4 border-t border-amber-400/30">
+                  <p className="text-xs text-amber-100">Awaiting action</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Completed This Month */}
+          <Card className="bg-gradient-to-br from-emerald-500 to-green-600 border-0 shadow-lg hover:shadow-xl transition-all hover:scale-105">
+            <CardContent className="p-6 relative overflow-hidden">
+              <CheckCircle className="absolute top-4 right-4 w-16 h-16 text-white opacity-20" />
+              <div className="relative z-10">
+                <p className="text-sm font-medium text-emerald-100 mb-1">Completed This Month</p>
+                <p className="text-4xl font-bold text-white">
+                  {statsLoading ? '...' : stats?.completedThisMonth || 0}
+                </p>
+                <div className="mt-4 pt-4 border-t border-emerald-400/30">
+                  <p className="text-xs text-emerald-100">Successfully closed</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Value */}
+          <Card className="bg-gradient-to-br from-purple-500 to-pink-600 border-0 shadow-lg hover:shadow-xl transition-all hover:scale-105">
+            <CardContent className="p-6 relative overflow-hidden">
+              <DollarSign className="absolute top-4 right-4 w-16 h-16 text-white opacity-20" />
+              <div className="relative z-10">
+                <p className="text-sm font-medium text-purple-100 mb-1">Total Value</p>
+                <p className="text-3xl font-bold text-white">
+                  {statsLoading ? '...' : formatCurrency(stats?.totalValue || 0)}
+                </p>
+                <p className="text-xs text-purple-100 mt-0.5">OMR</p>
+                <div className="mt-4 pt-4 border-t border-purple-400/30">
+                  <p className="text-xs text-purple-100">Active chains value</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Action Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6">
+          <Button
+            onClick={() => navigate('/chains/new')}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-300 gap-2 px-6 h-11 transition-all hover:scale-105"
+          >
+            <Plus className="w-5 h-5" />
+            New Chain
+          </Button>
+
+          <div className="flex gap-3 items-center flex-1 max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Search chains..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Recent Invoices */}
-      <div className="bg-card rounded-xl border border-border shadow-sm">
-        <div className="p-6 border-b border-border flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              Recent Invoices
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Latest invoices uploaded to the system
-            </p>
-          </div>
-          <Link to="/invoices">
-            <Button variant="outline" size="sm" className="gap-2">
-              View All
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Link>
+      {/* Chain List */}
+      <div className="px-6 pb-6">
+        <div className="space-y-3">
+          {chainsLoading ? (
+            <div className="text-center py-12">
+              <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
+              <p className="text-slate-600 mt-2">Loading chains...</p>
+            </div>
+          ) : filteredChains.length === 0 ? (
+            <Card className="bg-white border-0 shadow-sm">
+              <CardContent className="p-12 text-center">
+                <p className="text-slate-600">
+                  {searchQuery ? 'No chains found matching your search.' : 'No chains yet. Create your first one!'}
+                </p>
+                {!searchQuery && (
+                  <Button
+                    onClick={() => navigate('/chains/new')}
+                    className="mt-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all hover:scale-105"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Chain
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            filteredChains.map((chain) => (
+              <Card
+                key={chain.chainId}
+                className="bg-white border-0 shadow-md hover:shadow-xl transition-all cursor-pointer group hover:scale-[1.02] hover:bg-gradient-to-br hover:from-white hover:to-blue-50"
+                onClick={() => navigate(`/chains/${chain.chainUuid}`)}
+              >
+                <CardContent className="p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    {/* Chain Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-slate-900 text-lg truncate">
+                              {chain.chainNumber}
+                            </h3>
+                            <Badge className={`${getStatusColor(chain.status.code)} font-medium px-3 py-1 shadow-md`}>
+                              {chain.status.name}
+                            </Badge>
+                          </div>
+                          <p className="text-slate-700 font-medium mb-2">{chain.title}</p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                            <span>Vendor: <span className="font-medium text-slate-900">{chain.vendor.name}</span></span>
+                            <span>•</span>
+                            <span>Dept: <span className="font-medium text-slate-900">{chain.department.name}</span></span>
+                            <span>•</span>
+                            <span>Amount: <span className="font-medium text-slate-900">{formatCurrency(chain.amounts.estimated)} OMR</span></span>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                      </div>
+
+                      {/* Pipeline Progress */}
+                      <div className="mt-4 pt-4 border-t border-slate-100">
+                        <PipelineProgress
+                          hasQuotation={chain.documentCounts.quotations > 0}
+                          hasLPO={chain.documentCounts.lpos > 0}
+                          hasDeliveryOrder={chain.documentCounts.deliveryOrders > 0}
+                          hasInvoice={chain.documentCounts.invoices > 0}
+                          hasPayment={chain.documentCounts.payments > 0}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Invoice #</th>
-                <th>Date</th>
-                <th>Department</th>
-                <th>Vendor</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoicesLoading ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-8">
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                      <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      Loading invoices...
-                    </div>
-                  </td>
-                </tr>
-              ) : recentInvoices.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-12">
-                    <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                    <p className="text-muted-foreground">No invoices yet</p>
-                    <Link to="/upload" className="mt-2 inline-block">
-                      <Button size="sm" variant="outline">
-                        Upload your first invoice
-                      </Button>
-                    </Link>
-                  </td>
-                </tr>
-              ) : (
-                recentInvoices.map((invoice) => (
-                  <tr key={invoice.InvoiceID}>
-                    <td>
-                      <Link
-                        to={`/invoices/${invoice.InvoiceUUID}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {invoice.InvoiceNumber}
-                      </Link>
-                    </td>
-                    <td className="text-muted-foreground">
-                      {invoice.InvoiceDate
-                        ? format(new Date(invoice.InvoiceDate), 'MMM d, yyyy')
-                        : '-'}
-                    </td>
-                    <td>{invoice.DepartmentName}</td>
-                    <td>{invoice.VendorName || '-'}</td>
-                    <td className="font-medium">
-                      {invoice.CurrencyCode}{' '}
-                      {invoice.TotalAmount?.toLocaleString('en-OM', {
-                        minimumFractionDigits: 3,
-                        maximumFractionDigits: 3,
-                      })}
-                    </td>
-                    <td>
-                      <StatusBadge status={invoice.StatusCode} />
-                    </td>
-                    <td>
-                      <Link to={`/invoices/${invoice.InvoiceUUID}`}>
-                        <Button variant="ghost" size="sm">
-                          View
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* Pagination Info */}
+        {filteredChains.length > 0 && (
+          <div className="mt-6 text-center">
+            <p className="text-sm text-slate-600">
+              Showing {filteredChains.length} of {chains.length} chains
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
