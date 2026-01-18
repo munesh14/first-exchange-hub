@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,9 +91,14 @@ const DEPARTMENTS: Department[] = [
 
 export default function LPOUpload() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const chainId = searchParams.get('chainId');
+  const quotationId = searchParams.get('quotationId');
+
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [loadingQuotation, setLoadingQuotation] = useState(false);
 
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -126,6 +131,59 @@ export default function LPOUpload() {
       setDepartmentId('');
     }
   }, [branchId, isHeadOffice]);
+
+  // Load quotation data if quotationId is provided
+  useEffect(() => {
+    async function loadQuotation() {
+      if (!quotationId) return;
+
+      setLoadingQuotation(true);
+      try {
+        const response = await fetch(`http://localhost:3010/api/quotations/${quotationId}`);
+        if (!response.ok) throw new Error('Failed to load quotation');
+
+        const result = await response.json();
+        if (result.success && result.data) {
+          const quotation = result.data.quotation;
+          const lineItems = result.data.lineItems || [];
+
+          // Pre-fill LPO with quotation data
+          const lpoData: ExtractedLPO = {
+            LPOID: 0, // Will be assigned on save
+            LPOUUID: generateUUID(),
+            LPONumber: 'DRAFT',
+            VendorName: quotation.VendorName,
+            VendorAddress: quotation.VendorAddress || '',
+            VendorContact: quotation.VendorEmail || '',
+            VendorPhone: quotation.VendorPhone || '',
+            QuotationReference: quotation.QuotationNumber || '',
+            SubTotal: quotation.SubTotal,
+            VATAmount: quotation.VATAmount,
+            TotalAmount: quotation.TotalAmount,
+            ConfidenceScore: 100, // Pre-filled from saved quotation
+            Items: lineItems.map((item: any) => ({
+              id: generateUUID(),
+              description: item.Description,
+              quantity: item.Quantity,
+              unit: 'EA',
+              unitPrice: item.UnitPrice,
+              totalPrice: item.TotalPrice,
+            })),
+          };
+
+          setEditedLPO(lpoData);
+          setIsEditing(true); // Go directly to edit mode
+        }
+      } catch (error) {
+        console.error('Error loading quotation:', error);
+        setUploadError('Failed to load quotation data. Please try again.');
+      } finally {
+        setLoadingQuotation(false);
+      }
+    }
+
+    loadQuotation();
+  }, [quotationId]);
 
   // File upload handler
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -545,8 +603,21 @@ export default function LPOUpload() {
           </CardContent>
         </Card>
 
-        {/* Step 2: Upload Area */}
-        <Card className={`bg-white/80 backdrop-blur border-0 shadow-sm ${!isSelectionValid ? 'opacity-60' : ''}`}>
+        {/* Loading Quotation State */}
+        {loadingQuotation && (
+          <Card className="bg-white/80 backdrop-blur border-0 shadow-sm">
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <p className="text-slate-600">Loading quotation data...</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2: Upload Area - Hide if quotationId is present */}
+        {!quotationId && !loadingQuotation && (
+          <Card className={`bg-white/80 backdrop-blur border-0 shadow-sm ${!isSelectionValid ? 'opacity-60' : ''}`}>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
@@ -659,6 +730,7 @@ export default function LPOUpload() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* Success Modal with Edit Capability */}

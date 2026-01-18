@@ -285,6 +285,14 @@ export default function ChainDetail() {
                           <Download className="w-4 h-4" />
                           Download
                         </Button>
+                        <Button
+                          size="sm"
+                          className="gap-2 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white"
+                          onClick={() => navigate(`/lpo/new?chainId=${chain.chainUuid}&quotationId=${quot.quotationUuid}`)}
+                        >
+                          <ClipboardList className="w-4 h-4" />
+                          Create LPO →
+                        </Button>
                       </div>
                     </div>
                   ))}
