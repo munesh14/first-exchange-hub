@@ -39,6 +39,10 @@ export default function QuotationCard({ quotation, onView, onDownload }: Quotati
   };
 
   const handleDownload = () => {
+    if (!quotation.FilePath || quotation.FilePath === '') {
+      alert('No file attached to this quotation');
+      return;
+    }
     if (onDownload) {
       onDownload(quotation.QuotationUUID);
     }
@@ -125,6 +129,7 @@ export default function QuotationCard({ quotation, onView, onDownload }: Quotati
               variant="outline"
               size="sm"
               onClick={handleDownload}
+              disabled={!quotation.FilePath || quotation.FilePath === ''}
             >
               <Download className="w-4 h-4" />
             </Button>

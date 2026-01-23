@@ -102,6 +102,10 @@ export default function QuotationDetail() {
   };
 
   const handleDownload = () => {
+    if (!quotation?.FilePath || quotation.FilePath === '') {
+      alert('No file attached to this quotation');
+      return;
+    }
     if (uuid) {
       downloadQuotationFile(uuid);
     }
@@ -168,7 +172,11 @@ export default function QuotationDetail() {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleDownload}>
+              <Button
+                variant="outline"
+                onClick={handleDownload}
+                disabled={!quotation.FilePath || quotation.FilePath === ''}
+              >
                 <Download className="w-4 h-4 mr-2" />
                 Download
               </Button>
