@@ -437,7 +437,11 @@ export default function ChainDetail() {
                     <Button
                       size="lg"
                       className="gap-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg hover:shadow-xl transition-all"
-                      onClick={() => navigate(`/delivery-orders/new?chainId=${chain.chainUuid}`)}
+                      onClick={() => {
+                        const approvedLpo = documents.lpos.find(lpo => lpo.status === 'APPROVED' || lpo.status === 'Approved');
+                        const lpoParam = approvedLpo ? `&lpoId=${approvedLpo.lpoUuid}` : '';
+                        navigate(`/delivery-orders/new?chainId=${chain.chainUuid}${lpoParam}`);
+                      }}
                     >
                       <Plus className="w-5 h-5" />
                       Add Delivery Order
@@ -487,7 +491,11 @@ export default function ChainDetail() {
                     size="sm"
                     variant="outline"
                     className="w-full gap-2 border-dashed"
-                    onClick={() => navigate(`/delivery-orders/new?chainId=${chain.chainUuid}`)}
+                    onClick={() => {
+                      const approvedLpo = documents.lpos.find(lpo => lpo.status === 'APPROVED' || lpo.status === 'Approved');
+                      const lpoParam = approvedLpo ? `&lpoId=${approvedLpo.lpoUuid}` : '';
+                      navigate(`/delivery-orders/new?chainId=${chain.chainUuid}${lpoParam}`);
+                    }}
                   >
                     <Plus className="w-4 h-4" />
                     Add Another Delivery

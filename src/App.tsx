@@ -26,6 +26,7 @@ const LPOUpload = lazy(() => import("./pages/LPOUpload"));
 const LPODetail = lazy(() => import("./pages/LPODetail"));
 const PendingApprovals = lazy(() => import("./pages/PendingApprovals"));
 const DeliveryOrderList = lazy(() => import("./pages/DeliveryOrderList"));
+const DeliveryOrderNew = lazy(() => import("./pages/DeliveryOrderNew"));
 const DeliveryOrderDetail = lazy(() => import("./pages/DeliveryOrderDetail"));
 const RecordPayment = lazy(() => import("./pages/RecordPayment"));
 const PDCTracker = lazy(() => import("./pages/PDCTracker"));
@@ -92,6 +93,7 @@ const App = () => (
 
                 {/* Delivery Orders */}
                 <Route path="/delivery-orders" element={<DeliveryOrderList />} />
+                <Route path="/delivery-orders/new" element={<DeliveryOrderNew />} />
                 <Route path="/delivery-orders/:uuid" element={<DeliveryOrderDetail />} />
 
                 {/* Payments */}
