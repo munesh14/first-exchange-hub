@@ -161,7 +161,7 @@ export default function DeliveryOrderNew() {
         branchId: lpo?.RequestingBranchID,
         totalItemsOrdered: totalOrdered,
         totalItemsReceived: totalReceived,
-        status: getOverallStatus(),
+        // Note: Status is auto-determined by backend based on received quantities
         notes: `${deliveryNoteNumber ? `Delivery Note: ${deliveryNoteNumber}\n` : ''}${remarks || ''}`.trim() || undefined,
         createdBy: 1, // TODO: Get from user context
         items: items.map((item, index) => ({
